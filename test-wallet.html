@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>钱包连接测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; cursor: pointer; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        #status { margin: 20px 0; padding: 15px; border: 1px solid #ccc; background: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <h1>🦊 MetaMask连接测试</h1>
+    
+    <div id="status">
+        <p>状态: <span id="connection-status">未连接</span></p>
+        <p>钱包地址: <span id="wallet-address">无</span></p>
+        <p>当前网络: <span id="current-network">未知</span></p>
+        <p>链ID: <span id="chain-id">未知</span></p>
+    </div>
+    
+    <button onclick="detectMetaMask()">检测MetaMask</button>
+    <button onclick="connectWallet()">连接钱包</button>
+    <button onclick="addMonadNetwork()">添加Monad网络</button>
+    <button onclick="switchToMonad()">切换到Monad</button>
+    
+    <div id="logs" style="margin-top: 20px; padding: 10px; background: #f0f0f0; height: 300px; overflow-y: scroll; font-family: monospace; font-size: 12px;"></div>
+    
+    <script>
+        let ethereum = null;
+        
+        function log(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
+            logs.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logs.scrollTop = logs.scrollHeight;
+            console.log(message);
+        }
+        
+        function updateStatus() {
+            if (!ethereum) return;
+            
+            ethereum.request({ method: 'eth_accounts' }).then(accounts => {
+                document.getElementById('connection-status').textContent = accounts.length > 0 ? '已连接' : '未连接';
+                document.getElementById('wallet-address').textContent = accounts.length > 0 ? accounts[0] : '无';
+            });
+            
+            ethereum.request({ method: 'eth_chainId' }).then(chainId => {
+                const chainIdDec = parseInt(chainId, 16);
+                document.getElementById('chain-id').textContent = `${chainIdDec} (${chainId})`;
+                
+                if (chainIdDec === 10143) {
+                    document.getElementById('current-network').textContent = 'Monad Testnet ✅';
+                } else {
+                    document.getElementById('current-network').textContent = `其他网络 (${chainIdDec})`;
+                }
+            });
+        }
+        
+        function detectMetaMask() {
+            log('正在检测MetaMask...');
+            
+            if (typeof window.ethereum !== 'undefined') {
+                ethereum = window.ethereum;
+                log('✅ MetaMask已检测到', 'success');
+                log(`MetaMask版本: ${ethereum.isMetaMask ? 'MetaMask' : '其他钱包'}`);
+                log(`提供者数量: ${ethereum.providers ? ethereum.providers.length : 1}`);
+                updateStatus();
+            } else {
+                log('❌ 未检测到MetaMask，请安装MetaMask扩展', 'error');
+            }
+        }
+        
+        async function connectWallet() {
+            if (!ethereum) {
+                log('❌ 请先检测MetaMask', 'error');
+                return;
+            }
+            
+            try {
+                log('正在连接钱包...');
+                const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+                log(`✅ 钱包连接成功: ${accounts[0]}`, 'success');
+                updateStatus();
+            } catch (error) {
+                log(`❌ 连接失败: ${error.message}`, 'error');
+                if (error.code) {
+                    log(`错误代码: ${error.code}`, 'error');
+                }
+            }
+        }
+        
+        async function addMonadNetwork() {
+            if (!ethereum) {
+                log('❌ 请先检测MetaMask', 'error');
+                return;
+            }
+            
+            try {
+                log('正在添加Monad测试网...');
+                await ethereum.request({
+                    method: 'wallet_addEthereumChain',
+                    params: [{
+                        chainId: '0x279f',
+                        chainName: 'Monad Testnet',
+                        nativeCurrency: {
+                            name: 'MON',
+                            symbol: 'MON',
+                            decimals: 18,
+                        },
+                        rpcUrls: ['https://testnet-rpc.monad.xyz'],
+                        blockExplorerUrls: ['https://testnet-explorer.monad.xyz'],
+                    }],
+                });
+                log('✅ Monad测试网添加成功', 'success');
+                updateStatus();
+            } catch (error) {
+                log(`❌ 添加网络失败: ${error.message}`, 'error');
+                if (error.code === 4001) {
+                    log('用户拒绝了添加网络请求', 'error');
+                }
+            }
+        }
+        
+        async function switchToMonad() {
+            if (!ethereum) {
+                log('❌ 请先检测MetaMask', 'error');
+                return;
+            }
+            
+            try {
+                log('正在切换到Monad测试网...');
+                await ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0x279f' }],
+                });
+                log('✅ 成功切换到Monad测试网', 'success');
+                updateStatus();
+            } catch (error) {
+                log(`❌ 切换网络失败: ${error.message}`, 'error');
+                if (error.code === 4902) {
+                    log('网络不存在，正在尝试添加...', 'info');
+                    await addMonadNetwork();
+                } else if (error.code === 4001) {
+                    log('用户拒绝了切换网络请求', 'error');
+                }
+            }
+        }
+        
+        // 页面加载时自动检测
+        window.addEventListener('load', () => {
+            log('页面加载完成，开始检测MetaMask...');
+            detectMetaMask();
+        });
+        
+        // 监听网络和账户变化
+        if (typeof window.ethereum !== 'undefined') {
+            window.ethereum.on('accountsChanged', (accounts) => {
+                log(`账户变化: ${accounts.length > 0 ? accounts[0] : '无'}`);
+                updateStatus();
+            });
+            
+            window.ethereum.on('chainChanged', (chainId) => {
+                const chainIdDec = parseInt(chainId, 16);
+                log(`网络变化: ${chainIdDec} (${chainId})`);
+                updateStatus();
+            });
+        }
+    </script>
+</body>
+</html>

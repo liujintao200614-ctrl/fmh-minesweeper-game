@@ -1,0 +1,45 @@
+/* 隐藏包含 MetaMask 错误的 Next.js 错误覆盖层 */
+
+/* Next.js 错误对话框选择器 */
+[data-nextjs-dialog-overlay] {
+  display: none !important;
+}
+
+[data-nextjs-dialog] {
+  display: none !important;
+}
+
+.nextjs-container-errors-header,
+.nextjs-container-errors-body,
+.nextjs-container-errors,
+#__next-dev-error-overlay {
+  display: none !important;
+}
+
+/* 通用错误覆盖层 */
+.error-overlay,
+[data-testid="error-overlay"],
+[role="dialog"][aria-labelledby*="error"],
+[aria-live="assertive"] {
+  display: none !important;
+}
+
+/* 隐藏所有包含特定错误文本的元素 */
+*:has-text("Failed to connect to MetaMask"),
+*:has-text("Unhandled Runtime Error"),
+*:has-text("chrome-extension") {
+  display: none !important;
+}
+
+/* 针对 Next.js 开发模式的特定样式 */
+body:has([data-nextjs-dialog-overlay]) [data-nextjs-dialog-overlay] {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* 确保应用内容正常显示 */
+#__next {
+  display: block !important;
+  visibility: visible !important;
+}
