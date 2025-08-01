@@ -1,0 +1,3 @@
+[submodule "minesweeper-monad/contracts-clean/lib/forge-std"]
+	path = minesweeper-monad/contracts-clean/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
