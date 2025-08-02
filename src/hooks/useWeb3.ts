@@ -52,22 +52,29 @@ export const useWeb3 = () => {
         throw new Error('No wallet accounts available. Please unlock your wallet.');
       }
 
-      // 创建provider和signer
-      const provider = new ethers.BrowserProvider(ethereum);
-      const network = await provider.getNetwork();
+      // 创建provider和signer，禁用 ENS 解析
+      const provider = new ethers.BrowserProvider(ethereum, {
+        name: 'Monad Testnet',
+        chainId: MONAD_TESTNET_CHAIN_ID,
+        ensAddress: null, // 禁用 ENS
+      });
       const signer = await provider.getSigner();
+
+      // 获取当前网络 ID
+      const currentChainId = await ethereum.request({ method: 'eth_chainId' });
+      const numericChainId = parseInt(currentChainId, 16);
 
       console.log('Wallet connected successfully:', {
         account: accounts[0],
-        chainId: Number(network.chainId),
-        networkName: network.name
+        chainId: numericChainId,
+        networkName: 'Monad Testnet'
       });
 
       setWeb3State({
         provider,
         signer,
         account: accounts[0],
-        chainId: Number(network.chainId),
+        chainId: numericChainId,
         isConnected: true,
         isLoading: false,
         error: null,
@@ -123,11 +130,11 @@ export const useWeb3 = () => {
         console.log('Successfully switched to Monad Testnet');
         
         // 更新状态
-        const provider = new ethers.BrowserProvider(ethereum);
-        const network = await provider.getNetwork();
+        const currentChainId = await ethereum.request({ method: 'eth_chainId' });
+        const numericChainId = parseInt(currentChainId, 16);
         setWeb3State(prev => ({
           ...prev,
-          chainId: Number(network.chainId),
+          chainId: numericChainId,
         }));
         
         return true;

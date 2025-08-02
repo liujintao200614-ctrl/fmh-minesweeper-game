@@ -78,8 +78,12 @@ export const useWeb3Optimized = () => {
         accounts.push(...newAccounts);
       }
 
-      // 第三步：快速初始化 provider
-      const provider = new ethers.BrowserProvider(ethereum);
+      // 第三步：快速初始化 provider，禁用 ENS
+      const provider = new ethers.BrowserProvider(ethereum, {
+        name: 'Monad Testnet',
+        chainId: MONAD_TESTNET_CHAIN_ID,
+        ensAddress: null, // 禁用 ENS
+      });
       
       // 第四步：并行获取必要信息
       const promises = [
