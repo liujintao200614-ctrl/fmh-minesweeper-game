@@ -21,17 +21,17 @@ contract MinesweeperGame is ReentrancyGuard {
     mapping(address => bool) public authorizedSigners; // 授权签名者
     uint256 public signerCount; // 签名者数量
     bool public paused; // 紧急暂停
-    uint256 public dailyRewardLimit = 10000 ether; // 每日奖励上限 10000 FMH
+    uint256 public dailyRewardLimit = 50000 ether; // 测试期：每日奖励上限 50000 FMH
     uint256 public dailyRewardUsed; // 今日已使用奖励
     uint256 public lastResetDay; // 上次重置日期
     
-    // 调整经济参数 - 低成本高奖励机制
-    uint256 public constant GAME_FEE_MON = 1 * 10**18; // 仅1 MON代币作为游戏费用
-    uint256 public constant WIN_REWARD = 50 ether; // 大幅提高基础奖励 50 FMH
-    uint256 public constant PERFECT_BONUS = 100 ether; // 大幅提高完美奖励 100 FMH
-    uint256 public constant SPEED_BONUS_FAST = 50 ether; // 大幅提高速度奖励 50 FMH
-    uint256 public constant SPEED_BONUS_MEDIUM = 25 ether; // 大幅提高速度奖励 25 FMH
-    uint256 public constant MAX_REWARD_PER_CLAIM = 500 ether; // 单次最大奖励限制 500 FMH
+    // 测试阶段经济参数 - 超低成本高奖励机制
+    uint256 public constant GAME_FEE_MON = 1 * 10**15; // 测试期：仅0.001 MON代币 (降低1000倍)
+    uint256 public constant WIN_REWARD = 100 ether; // 测试期：基础奖励提升到100 FMH
+    uint256 public constant PERFECT_BONUS = 200 ether; // 测试期：完美奖励200 FMH
+    uint256 public constant SPEED_BONUS_FAST = 100 ether; // 测试期：快速奖励100 FMH
+    uint256 public constant SPEED_BONUS_MEDIUM = 50 ether; // 测试期：中速奖励50 FMH
+    uint256 public constant MAX_REWARD_PER_CLAIM = 1000 ether; // 测试期：单次最大1000 FMH
     uint256 public constant MAX_GAME_DURATION = 3600; // 最大游戏时长1小时
     uint256 public constant MIN_GAME_DURATION = 1; // 最小游戏时长1秒
     

@@ -638,6 +638,20 @@ export default function ModernMinesweeper() {
           <Logo>🎮 FMH 扫雷</Logo>
           
           <WalletSection>
+            {!localGameMode && (
+              <div style={{ 
+                background: 'linear-gradient(45deg, #4CAF50, #45a049)', 
+                color: 'white', 
+                padding: '0.5rem 1rem', 
+                borderRadius: '20px', 
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 2px 8px rgba(76, 175, 80, 0.3)'
+              }}>
+                🧪 测试期：0.001 MON → 100+ FMH
+              </div>
+            )}
             <GameModeToggle theme={{ web3Mode: !localGameMode }}>
               <span>Web3</span>
               <div 

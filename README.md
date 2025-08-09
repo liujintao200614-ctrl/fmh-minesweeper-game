@@ -13,14 +13,18 @@ A modern blockchain-based minesweeper game with beautiful UI and Web3 integratio
 - **Touch Optimized**: Advanced mobile controls with long-press flagging
 - **Progressive Enhancement**: Works seamlessly across desktop and mobile
 
-## Reward System
+## 🧪 测试期奖励系统 (超值体验！)
 
-- **Base Win Reward**: 10 FMH tokens
-- **Perfect Game Bonus**: +50 FMH (completed in <60 seconds with score ≥1000)
-- **Speed Bonuses**:
-  - Under 30 seconds: +20 FMH
-  - Under 120 seconds: +5 FMH
-- **Game Fee**: 0.001 MON per game
+- **游戏费用**: 仅 0.001 MON (降低1000倍!)
+- **基础奖励**: 100 FMH (提升2倍)
+- **完美游戏**: +200 FMH (<60秒 + 高分)
+- **速度奖励**:
+  - 超快速 <30秒: +100 FMH
+  - 快速 <120秒: +50 FMH
+- **单次最高**: 1000 FMH
+- **每日上限**: 50000 FMH
+
+> ⚡ **测试期特惠**：几乎零成本体验，超高代币奖励！
 
 ## Prerequisites
 

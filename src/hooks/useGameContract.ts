@@ -23,17 +23,28 @@ const FMH_TOKEN_ABI = [
   "function decimals() external view returns (uint8)"
 ];
 
+const MON_TOKEN_ABI = [
+  "function balanceOf(address account) external view returns (uint256)",
+  "function approve(address spender, uint256 amount) external returns (bool)",
+  "function allowance(address owner, address spender) external view returns (uint256)",
+  "function name() external view returns (string)",
+  "function symbol() external view returns (string)",
+  "function decimals() external view returns (uint8)"
+];
+
 // Contract addresses
 const CONTRACT_ADDRESSES = {
   MINESWEEPER_GAME: process.env.NEXT_PUBLIC_MINESWEEPER_CONTRACT || "0x4bE377d2bf2b3412b6eBF1b179314fd90adf9C27",
-  FMH_TOKEN: process.env.NEXT_PUBLIC_FMH_TOKEN_CONTRACT || "0x83aB028468ef2a5495Cc7964B3266437956231E2"
+  FMH_TOKEN: process.env.NEXT_PUBLIC_FMH_TOKEN_CONTRACT || "0x83aB028468ef2a5495Cc7964B3266437956231E2",
+  MON_TOKEN: "0x0000000000000000000000000000000000000000" // 需要设置正确的 MON 代币地址
 };
 
 export const useGameContract = (signer: ethers.JsonRpcSigner | null, account: string | null) => {
   const [contracts, setContracts] = useState<{
     gameContract: ethers.Contract | null;
     tokenContract: ethers.Contract | null;
-  }>({ gameContract: null, tokenContract: null });
+    monContract: ethers.Contract | null;
+  }>({ gameContract: null, tokenContract: null, monContract: null });
   
   const [gameStats, setGameStats] = useState<GameStats>({
     gamesWon: 0,
