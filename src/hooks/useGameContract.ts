@@ -70,10 +70,27 @@ export const useGameContract = (signer: ethers.JsonRpcSigner | null, account: st
       return null;
     }
 
+    // 验证参数范围，确保在 uint8 范围内 (0-255)
+    if (width < 1 || width > 255 || height < 1 || height > 255 || mines < 1 || mines > 255) {
+      console.error('Invalid parameters for contract:', { width, height, mines });
+      setError(`Invalid game parameters. Width: ${width}, Height: ${height}, Mines: ${mines}`);
+      return null;
+    }
+
+    // 确保地雷数不超过总格子数
+    const totalCells = width * height;
+    if (mines >= totalCells) {
+      console.error('Too many mines for board size:', { width, height, mines, totalCells });
+      setError(`Too many mines (${mines}) for board size ${width}x${height}`);
+      return null;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
+      console.log('🚀 Starting contract game with validated parameters:', { width, height, mines });
+      
       const gameFee = await contracts.gameContract.GAME_FEE();
       
       // 估算Gas费用

@@ -342,7 +342,7 @@ const defaultGameConfig: GameConfig = {
 const presets = {
   easy: { width: 9, height: 9, mines: 10 },
   medium: { width: 16, height: 16, mines: 40 },
-  hard: { width: 30, height: 16, mines: 99 }
+  hard: { width: 24, height: 16, mines: 80 }  // 调整为合理范围，避免溢出
 };
 
 export default function ModernMinesweeper() {
@@ -756,7 +756,7 @@ export default function ModernMinesweeper() {
                     min="5" 
                     max="30" 
                     value={gameConfig.width}
-                    onChange={(e) => setGameConfig(prev => ({ ...prev, width: parseInt(e.target.value) || 5 }))}
+                    onChange={(e) => setGameConfig(prev => ({ ...prev, width: Math.min(Math.max(parseInt(e.target.value) || 5, 5), 30) }))}
                   />
                 </SettingRow>
 
@@ -767,7 +767,7 @@ export default function ModernMinesweeper() {
                     min="5" 
                     max="30" 
                     value={gameConfig.height}
-                    onChange={(e) => setGameConfig(prev => ({ ...prev, height: parseInt(e.target.value) || 5 }))}
+                    onChange={(e) => setGameConfig(prev => ({ ...prev, height: Math.min(Math.max(parseInt(e.target.value) || 5, 5), 30) }))}
                   />
                 </SettingRow>
 
@@ -778,7 +778,11 @@ export default function ModernMinesweeper() {
                     min="1" 
                     max={Math.floor(gameConfig.width * gameConfig.height * 0.8)}
                     value={gameConfig.mines}
-                    onChange={(e) => setGameConfig(prev => ({ ...prev, mines: parseInt(e.target.value) || 1 }))}
+                    onChange={(e) => {
+                      const mines = parseInt(e.target.value) || 1;
+                      const maxMines = Math.floor(gameConfig.width * gameConfig.height * 0.8);
+                      setGameConfig(prev => ({ ...prev, mines: Math.min(Math.max(mines, 1), Math.min(maxMines, 200)) }));
+                    }}
                   />
                 </SettingRow>
               </GameSettings>
