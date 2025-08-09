@@ -1,0 +1,31 @@
+# Ignore all static HTML files
+*.html
+!pages/**
+!public/**
+
+# Ignore development files
+*.sh
+test-*.js
+simple-test-server.js
+diagnostic-server.js
+
+# Ignore backup and temporary files
+*-backup.*
+*-old.*
+*-debug.*
+*-simple.*
+*-fixed.*
+*-improved.*
+*-integrated.*
+*-progressive.*
+*-step-by-step.*
+
+# Ignore test files
+__tests__/
+test/
+*.test.*
+*.spec.*
+
+# Ignore documentation files that might interfere
+*.md
+!README.md
