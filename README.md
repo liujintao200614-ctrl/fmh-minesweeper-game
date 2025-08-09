@@ -1,15 +1,17 @@
 # FMH Minesweeper Game
 
-A blockchain-based minesweeper game that rewards players with FMH tokens for winning games on the Monad testnet.
+A modern blockchain-based minesweeper game with beautiful UI and Web3 integration that rewards players with FMH tokens on the Monad testnet.
 
-## Features
+## 🎮 Features
 
-- **Classic Minesweeper Gameplay**: Traditional minesweeper with modern React interface
-- **FMH Token Rewards**: Earn FMH tokens for winning games
-- **Multiple Difficulty Levels**: Easy, Medium, Hard presets plus custom settings
-- **Bonus Rewards**: Extra tokens for perfect games and speed completions
-- **Web3 Integration**: MetaMask wallet connection for Monad testnet
-- **Player Statistics**: Track your wins, games played, and total rewards
+- **Modern Responsive Design**: Beautiful gradient UI with responsive layout for all devices
+- **Custom Color Themes**: Choose from 4 preset themes (Classic, Dark, Ocean, Forest)
+- **Real-time Scoring**: Live score calculation with time and efficiency bonuses
+- **Mine Revelation**: All mines are revealed at game end with special effects
+- **FMH Token Rewards**: Earn FMH tokens for winning games with Web3 integration
+- **Multiple Game Modes**: Web3 mode with rewards or Local mode for practice
+- **Touch Optimized**: Advanced mobile controls with long-press flagging
+- **Progressive Enhancement**: Works seamlessly across desktop and mobile
 
 ## Reward System
 
