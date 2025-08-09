@@ -1,19 +1,12 @@
 {
-  "framework": "nextjs",
   "buildCommand": "npm run build:next",
   "installCommand": "npm install --legacy-peer-deps",
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/index"
-    }
-  ],
   "functions": {
     "pages/api/**/*.js": {
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@3.0.0"
     },
     "pages/api/**/*.ts": {
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@3.0.0"
     }
   },
   "env": {
