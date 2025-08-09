@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>最小 MetaMask 测试</title>
+</head>
+<body>
+    <h1>MetaMask 连接测试</h1>
+    <button onclick="connectWallet()">连接 MetaMask</button>
+    <div id="result"></div>
+    
+    <script>
+        async function connectWallet() {
+            const result = document.getElementById('result');
+            
+            try {
+                if (typeof window.ethereum === 'undefined') {
+                    result.innerHTML = '❌ MetaMask 未安装';
+                    return;
+                }
+                
+                result.innerHTML = '🔄 连接中...';
+                
+                const accounts = await window.ethereum.request({
+                    method: 'eth_requestAccounts'
+                });
+                
+                result.innerHTML = `✅ 连接成功: ${accounts[0]}`;
+                
+            } catch (error) {
+                result.innerHTML = `❌ 连接失败: ${error.message} (代码: ${error.code})`;
+            }
+        }
+        
+        // 页面加载时检查
+        window.addEventListener('load', () => {
+            if (typeof window.ethereum !== 'undefined') {
+                document.getElementById('result').innerHTML = '✅ MetaMask 已检测到';
+            } else {
+                document.getElementById('result').innerHTML = '❌ MetaMask 未检测到';
+            }
+        });
+    </script>
+</body>
+</html>

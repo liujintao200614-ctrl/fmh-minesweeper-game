@@ -99,6 +99,7 @@ const WalletErrorHelper: React.FC<WalletErrorHelperProps> = ({ error, onRetry, o
 
   const getSolutionForError = (errorMessage: string) => {
     const lowerError = errorMessage.toLowerCase();
+    const isBrave = !!(navigator as any).brave;
     
     if (lowerError.includes('not detected') || lowerError.includes('not installed')) {
       return {
@@ -112,14 +113,28 @@ const WalletErrorHelper: React.FC<WalletErrorHelperProps> = ({ error, onRetry, o
     }
     
     if (lowerError.includes('rejected') || lowerError.includes('user denied')) {
-      return {
-        title: '🚫 连接被拒绝',
-        steps: [
-          '点击 MetaMask 扩展图标',
-          '选择 "连接" 或 "批准" 连接请求',
-          '确保选择了正确的账户'
-        ]
-      };
+      if (isBrave) {
+        return {
+          title: '🦁 Brave 浏览器连接被拒绝',
+          steps: [
+            '点击地址栏左侧的盾牌图标 🛡️',
+            '确保 "脚本已阻止" 显示为 0，如果不是请点击 "关闭"',
+            '检查 "广告和跟踪器已阻止"，必要时点击 "关闭"',
+            '刷新页面后重新尝试连接',
+            '或者：直接点击 MetaMask 扩展图标，选择 "连接到此网站"',
+            '在 MetaMask 弹窗中点击 "连接" 按钮'
+          ]
+        };
+      } else {
+        return {
+          title: '🚫 连接被拒绝',
+          steps: [
+            '点击 MetaMask 扩展图标',
+            '选择 "连接" 或 "批准" 连接请求',
+            '确保选择了正确的账户'
+          ]
+        };
+      }
     }
     
     if (lowerError.includes('already processing') || lowerError.includes('pending')) {

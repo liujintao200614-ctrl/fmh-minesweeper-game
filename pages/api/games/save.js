@@ -93,7 +93,7 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: 'Valid game ID is required' });
         }
 
-        const { getDatabase } = require('../../lib/database');
+        const { getDatabase } = require('../../../lib/database');
         const db = await getDatabase();
 
         // 检查用户是否存在，不存在则创建

@@ -9,12 +9,31 @@ contract MinesweeperGame is ReentrancyGuard {
     using ECDSA for bytes32;
     
     FMHToken public fmhToken;
-    address public owner;
+    IERC20 public monToken; // MON代币合约
+    address public owner; // 主要Owner（向后兼容）
     address public serverSigner; // 服务器签名地址
     
-    uint256 public constant GAME_FEE = 0.001 ether;
-    uint256 public constant WIN_REWARD = 10 ether; // 10 FMH tokens (gas优化)
-    uint256 public constant PERFECT_BONUS = 50 ether; // 50 FMH tokens for perfect game (gas优化)
+    // 多Owner管理
+    mapping(address => bool) public owners;
+    uint256 public ownerCount;
+    
+    // 多签名和安全控制
+    mapping(address => bool) public authorizedSigners; // 授权签名者
+    uint256 public signerCount; // 签名者数量
+    bool public paused; // 紧急暂停
+    uint256 public dailyRewardLimit = 10000 ether; // 每日奖励上限 10000 FMH
+    uint256 public dailyRewardUsed; // 今日已使用奖励
+    uint256 public lastResetDay; // 上次重置日期
+    
+    // 调整经济参数 - 低成本高奖励机制
+    uint256 public constant GAME_FEE_MON = 1 * 10**18; // 仅1 MON代币作为游戏费用
+    uint256 public constant WIN_REWARD = 50 ether; // 大幅提高基础奖励 50 FMH
+    uint256 public constant PERFECT_BONUS = 100 ether; // 大幅提高完美奖励 100 FMH
+    uint256 public constant SPEED_BONUS_FAST = 50 ether; // 大幅提高速度奖励 50 FMH
+    uint256 public constant SPEED_BONUS_MEDIUM = 25 ether; // 大幅提高速度奖励 25 FMH
+    uint256 public constant MAX_REWARD_PER_CLAIM = 500 ether; // 单次最大奖励限制 500 FMH
+    uint256 public constant MAX_GAME_DURATION = 3600; // 最大游戏时长1小时
+    uint256 public constant MIN_GAME_DURATION = 1; // 最小游戏时长1秒
     
     // EIP-712 类型哈希
     bytes32 public constant DOMAIN_TYPEHASH = keccak256(
@@ -50,9 +69,23 @@ contract MinesweeperGame is ReentrancyGuard {
     event GameCompleted(uint256 indexed gameId, address indexed player, bool won, uint256 score, uint256 duration);
     event RewardClaimed(uint256 indexed gameId, address indexed player, uint256 reward);
     event RewardClaimedWithSignature(uint256 indexed gameId, address indexed player, uint256 reward, uint256 nonce);
+    event OwnerAdded(address indexed newOwner);
+    event OwnerRemoved(address indexed removedOwner);
+    event SecurityAlert(string indexed alertType, address indexed user, uint256 value);
+    event FeesWithdrawn(address indexed owner, uint256 amount);
     
     modifier onlyOwner() {
-        require(msg.sender == owner, "Not owner");
+        require(owners[msg.sender] || msg.sender == owner, "Not owner");
+        _;
+    }
+    
+    modifier onlyAuthorizedSigner() {
+        require(authorizedSigners[msg.sender] || msg.sender == serverSigner, "Not authorized signer");
+        _;
+    }
+    
+    modifier whenNotPaused() {
+        require(!paused, "Contract is paused");
         _;
     }
     
@@ -61,17 +94,64 @@ contract MinesweeperGame is ReentrancyGuard {
         _;
     }
     
-    constructor(address _tokenAddress, address _serverSigner) {
-        owner = msg.sender;
-        fmhToken = FMHToken(_tokenAddress);
-        serverSigner = _serverSigner;
+    modifier checkDailyLimit(uint256 rewardAmount) {
+        uint256 currentDay = block.timestamp / 86400; // 当前日期
+        if (currentDay > lastResetDay) {
+            dailyRewardUsed = 0; // 重置每日使用量
+            lastResetDay = currentDay;
+        }
+        require(dailyRewardUsed + rewardAmount <= dailyRewardLimit, "Daily reward limit exceeded");
+        dailyRewardUsed += rewardAmount;
+        _;
     }
     
-    function startGame(uint8 width, uint8 height, uint8 mines) external payable returns (uint256) {
-        require(msg.value >= GAME_FEE, "Insufficient fee");
+    constructor(address _fmhTokenAddress, address _monTokenAddress, address _serverSigner) {
+        owner = msg.sender;
+        owners[msg.sender] = true;
+        ownerCount = 1;
+        fmhToken = FMHToken(_fmhTokenAddress);
+        monToken = IERC20(_monTokenAddress);
+        serverSigner = _serverSigner;
+        authorizedSigners[_serverSigner] = true;
+        signerCount = 1;
+        lastResetDay = block.timestamp / 86400;
+    }
+    
+    // 安全管理函数
+    function pause() external onlyOwner {
+        paused = true;
+    }
+    
+    function unpause() external onlyOwner {
+        paused = false;
+    }
+    
+    function addAuthorizedSigner(address signer) external onlyOwner {
+        require(signer != address(0), "Invalid signer address");
+        require(!authorizedSigners[signer], "Signer already authorized");
+        authorizedSigners[signer] = true;
+        signerCount++;
+    }
+    
+    function removeAuthorizedSigner(address signer) external onlyOwner {
+        require(authorizedSigners[signer], "Signer not authorized");
+        require(signerCount > 1, "Cannot remove last signer");
+        authorizedSigners[signer] = false;
+        signerCount--;
+    }
+    
+    function updateDailyRewardLimit(uint256 newLimit) external onlyOwner {
+        require(newLimit > 0, "Invalid limit");
+        dailyRewardLimit = newLimit;
+    }
+    
+    function startGame(uint8 width, uint8 height, uint8 mines) external whenNotPaused returns (uint256) {
         require(width >= 5 && width <= 30, "Invalid width");
         require(height >= 5 && height <= 30, "Invalid height");
         require(mines >= 1 && mines < (width * height), "Invalid mine count");
+        
+        // 收取MON代币作为游戏费用
+        require(monToken.transferFrom(msg.sender, address(this), GAME_FEE_MON), "MON payment failed");
         
         uint256 gameId = gameCounter++;
         
@@ -92,11 +172,6 @@ contract MinesweeperGame is ReentrancyGuard {
         
         emit GameStarted(gameId, msg.sender, width, height, mines);
         
-        // Refund excess payment
-        if (msg.value > GAME_FEE) {
-            payable(msg.sender).transfer(msg.value - GAME_FEE);
-        }
-        
         return gameId;
     }
     
@@ -104,6 +179,10 @@ contract MinesweeperGame is ReentrancyGuard {
         Game storage game = games[gameId];
         require(game.player == msg.sender, "Not your game");
         require(!game.isCompleted, "Game already completed");
+        
+        uint256 duration = block.timestamp - game.startTime;
+        require(duration >= MIN_GAME_DURATION, "Game too short");
+        require(duration <= MAX_GAME_DURATION, "Game too long");
         
         game.endTime = block.timestamp;
         game.isWon = won;
@@ -117,7 +196,7 @@ contract MinesweeperGame is ReentrancyGuard {
         emit GameCompleted(gameId, msg.sender, won, score, game.endTime - game.startTime);
     }
     
-    function claimReward(uint256 gameId) external gameExists(gameId) {
+    function claimReward(uint256 gameId) external gameExists(gameId) whenNotPaused {
         Game storage game = games[gameId];
         require(game.player == msg.sender, "Not your game");
         require(game.isCompleted, "Game not completed");
@@ -129,17 +208,32 @@ contract MinesweeperGame is ReentrancyGuard {
         uint256 reward = WIN_REWARD;
         uint256 duration = game.endTime - game.startTime;
         
-        // Perfect game bonus (completed in under 60 seconds with high score)
-        if (duration < 60 && game.score >= 1000) {
-            reward += PERFECT_BONUS;
+        // Perfect game bonus (降低门槛：60秒内或500分以上)
+        if (duration < 60 || game.score >= 500) {
+            reward += PERFECT_BONUS; // 100 FMH bonus
         }
         
-        // Speed bonus
-        if (duration < 30) {
-            reward += 20 ether; // 20 FMH bonus
-        } else if (duration < 120) {
-            reward += 5 ether; // 5 FMH bonus
+        // Speed bonus (更宽松的时间限制)
+        if (duration < 60) {
+            reward += SPEED_BONUS_FAST; // 50 FMH bonus
+        } else if (duration < 180) {
+            reward += SPEED_BONUS_MEDIUM; // 25 FMH bonus
         }
+        
+        // 新增：参与奖励（只要完成游戏就有额外奖励）
+        reward += 20 ether; // 无条件参与奖励 20 FMH
+        
+        // 检查每日奖励限额
+        uint256 currentDay = block.timestamp / 86400;
+        if (currentDay > lastResetDay) {
+            dailyRewardUsed = 0;
+            lastResetDay = currentDay;
+        }
+        require(dailyRewardUsed + reward <= dailyRewardLimit, "Daily reward limit exceeded");
+        dailyRewardUsed += reward;
+        
+        // 安全检查奖励限制
+        require(reward <= MAX_REWARD_PER_CLAIM, "Reward exceeds maximum");
         
         fmhToken.mint(msg.sender, reward);
         
@@ -199,17 +293,23 @@ contract MinesweeperGame is ReentrancyGuard {
         // 计算奖励
         uint256 reward = WIN_REWARD;
         
-        // Perfect game bonus (completed in under 60 seconds with high score)
-        if (duration < 60 && score >= 1000) {
-            reward += PERFECT_BONUS;
+        // Perfect game bonus (降低门槛：60秒内或500分以上)
+        if (duration < 60 || score >= 500) {
+            reward += PERFECT_BONUS; // 100 FMH bonus
         }
         
-        // Speed bonus
-        if (duration < 30) {
-            reward += 20 ether; // 20 FMH bonus
-        } else if (duration < 120) {
-            reward += 5 ether; // 5 FMH bonus
+        // Speed bonus (更宽松的时间限制)
+        if (duration < 60) {
+            reward += SPEED_BONUS_FAST; // 50 FMH bonus
+        } else if (duration < 180) {
+            reward += SPEED_BONUS_MEDIUM; // 25 FMH bonus
         }
+        
+        // 新增：参与奖励（只要完成游戏就有额外奖励）
+        reward += 20 ether; // 无条件参与奖励 20 FMH
+        
+        // 安全检查奖励限制
+        require(reward <= MAX_REWARD_PER_CLAIM, "Reward exceeds maximum");
         
         // 铸造代币奖励
         fmhToken.mint(player, reward);
@@ -273,7 +373,25 @@ contract MinesweeperGame is ReentrancyGuard {
     }
     
     function withdrawFees() external onlyOwner {
-        payable(owner).transfer(address(this).balance);
+        uint256 monBalance = monToken.balanceOf(address(this));
+        require(monBalance > 0, "No MON fees to withdraw");
+        
+        require(monToken.transfer(owner, monBalance), "MON withdrawal failed");
+        
+        emit FeesWithdrawn(owner, monBalance);
+    }
+    
+    // 用于销毁MON代币的功能（减少供应量）
+    function burnCollectedFees(uint256 amount) external onlyOwner {
+        uint256 monBalance = monToken.balanceOf(address(this));
+        require(amount <= monBalance, "Insufficient MON balance to burn");
+        require(amount > 0, "Amount must be greater than 0");
+        
+        // 如果MON代币有burn功能，可以直接销毁
+        // 这里假设转移到黑洞地址实现销毁
+        require(monToken.transfer(address(0), amount), "MON burn failed");
+        
+        emit SecurityAlert("MON_BURNED", msg.sender, amount);
     }
     
     function updateGameFee(uint256 newFee) external onlyOwner {
@@ -289,6 +407,14 @@ contract MinesweeperGame is ReentrancyGuard {
     }
     
     /**
+     * @dev 更新MON代币合约地址（仅合约拥有者）
+     */
+    function updateMonToken(address newMonToken) external onlyOwner {
+        require(newMonToken != address(0), "Invalid MON token address");
+        monToken = IERC20(newMonToken);
+    }
+    
+    /**
      * @dev 查询服务器签名地址
      */
     function getServerSigner() external view returns (address) {
@@ -296,9 +422,49 @@ contract MinesweeperGame is ReentrancyGuard {
     }
     
     /**
+     * @dev 查询MON代币合约地址
+     */
+    function getMonToken() external view returns (address) {
+        return address(monToken);
+    }
+    
+    /**
+     * @dev 查询合约中的MON代币余额
+     */
+    function getMonBalance() external view returns (uint256) {
+        return monToken.balanceOf(address(this));
+    }
+    
+    /**
      * @dev 检查nonce是否已使用
      */
     function isNonceUsed(address player, uint256 nonce) external view returns (bool) {
         return usedNonces[player][nonce];
+    }
+    
+    // 多Owner管理函数
+    function addOwner(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "Invalid owner address");
+        require(!owners[newOwner], "Owner already exists");
+        owners[newOwner] = true;
+        ownerCount++;
+        emit OwnerAdded(newOwner);
+    }
+    
+    function removeOwner(address ownerToRemove) external onlyOwner {
+        require(owners[ownerToRemove], "Owner does not exist");
+        require(ownerCount > 1, "Cannot remove last owner");
+        require(ownerToRemove != owner, "Cannot remove primary owner");
+        owners[ownerToRemove] = false;
+        ownerCount--;
+        emit OwnerRemoved(ownerToRemove);
+    }
+    
+    function isOwner(address addr) external view returns (bool) {
+        return owners[addr] || addr == owner;
+    }
+    
+    function getOwnerCount() external view returns (uint256) {
+        return ownerCount;
     }
 }

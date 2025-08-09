@@ -3,152 +3,340 @@ import styled from 'styled-components';
 import GameBoard from '@/components/GameBoard';
 import GameHeader from '@/components/GameHeader';
 import Leaderboard from '@/components/Leaderboard';
-import WalletErrorHelper from '@/components/WalletErrorHelper';
-import NetworkStatus from '@/components/NetworkStatus';
-import NetworkGuide from '@/components/NetworkGuide';
+import ThemeSelector from '@/components/ThemeSelector';
 import { useWeb3 } from '@/hooks/useWeb3';
 import { useGameContract } from '@/hooks/useGameContract';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useGameHistory } from '@/hooks/useGameHistory';
-import { GameState, GameConfig, Cell } from '@/types/game';
-import { ethers } from 'ethers';
+import { GameState, GameConfig } from '@/types/game';
 import {
   createEmptyBoard,
   placeMines,
   revealCell,
   toggleFlag,
   checkWinCondition,
-  calculateScore
+  calculateScore,
+  revealAllMines,
+  markTriggeredMine
 } from '@/utils/gameLogic';
+import { ColorTheme, DEFAULT_THEMES } from '@/types/game';
 
+// 现代化的样式设计
 const AppContainer = styled.div`
   min-height: 100vh;
-  background: #c0c0c0;
-  padding: 20px;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
 `;
 
-const GameContainer = styled.div`
-  max-width: 800px;
+const Header = styled.header`
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 1rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+`;
+
+const HeaderContent = styled.div`
+  max-width: 1200px;
   margin: 0 auto;
-  background: #c0c0c0;
-  border: 2px inset #c0c0c0;
-  padding: 20px;
+  padding: 0 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+`;
+
+const Logo = styled.h1`
+  font-size: 1.8rem;
+  font-weight: 700;
+  background: linear-gradient(45deg, #667eea, #764ba2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0;
 `;
 
 const WalletSection = styled.div`
-  background: #f0f0f0;
-  padding: 15px;
-  border: 2px inset #c0c0c0;
-  margin-bottom: 20px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
 `;
 
-const ConnectButton = styled.button`
-  padding: 10px 20px;
-  font-size: 16px;
-  background: #4CAF50;
-  color: white;
-  border: 2px outset #4CAF50;
+const WalletButton = styled.button<{ variant?: 'primary' | 'secondary' | 'danger' }>`
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  border: none;
   cursor: pointer;
-  border-radius: 4px;
-  margin: 5px;
-
-  &:hover {
-    background: #45a049;
-  }
-
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  
+  ${props => props.variant === 'primary' && `
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    color: white;
+    &:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
+  `}
+  
+  ${props => props.variant === 'secondary' && `
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    &:hover { background: rgba(102, 126, 234, 0.2); }
+  `}
+  
+  ${props => props.variant === 'danger' && `
+    background: rgba(255, 107, 107, 0.1);
+    color: #ff6b6b;
+    border: 1px solid rgba(255, 107, 107, 0.3);
+    &:hover { background: rgba(255, 107, 107, 0.2); }
+  `}
+  
   &:disabled {
-    background: #cccccc;
+    opacity: 0.6;
     cursor: not-allowed;
+    transform: none !important;
   }
 `;
 
-const NetworkWarning = styled.div`
-  background: #ff6b6b;
+const WalletInfo = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #666;
+`;
+
+const MainContent = styled.div`
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 2rem;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding: 1rem;
+  }
+`;
+
+const GameArea = styled.div`
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+`;
+
+const GameContent = styled.div`
+  padding: 1.5rem;
+`;
+
+const Sidebar = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  
+  @media (max-width: 768px) {
+    order: -1;
+  }
+`;
+
+const Card = styled.div`
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+`;
+
+const CardHeader = styled.div`
+  padding: 1rem 1.5rem;
+  background: linear-gradient(45deg, #667eea, #764ba2);
   color: white;
-  padding: 10px;
-  border-radius: 4px;
-  margin: 10px 0;
+  font-weight: 600;
+  font-size: 0.875rem;
+`;
+
+const CardContent = styled.div`
+  padding: 1.5rem;
 `;
 
 const GameSettings = styled.div`
-  background: #f0f0f0;
-  padding: 15px;
-  border: 2px inset #c0c0c0;
-  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 `;
 
 const SettingRow = styled.div`
   display: flex;
   align-items: center;
-  margin: 10px 0;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 1rem;
 `;
 
 const Label = styled.label`
-  min-width: 80px;
-  font-weight: bold;
+  font-weight: 500;
+  color: #333;
+  font-size: 0.875rem;
 `;
 
-const Input = styled.input`
-  padding: 5px;
-  border: 2px inset #c0c0c0;
-  width: 80px;
+const PresetButtons = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 `;
 
-const PresetButton = styled.button`
-  padding: 8px 16px;
-  margin: 5px;
-  background: #e0e0e0;
-  border: 2px outset #e0e0e0;
+const PresetButton = styled.button<{ active?: boolean }>`
+  padding: 0.5rem 1rem;
+  border: 1px solid ${props => props.active ? '#667eea' : '#ddd'};
+  background: ${props => props.active ? '#667eea' : 'white'};
+  color: ${props => props.active ? 'white' : '#666'};
+  border-radius: 6px;
+  font-size: 0.75rem;
   cursor: pointer;
-
+  transition: all 0.2s ease;
+  
   &:hover {
-    background: #d0d0d0;
-  }
-
-  &:active {
-    border: 2px inset #e0e0e0;
+    border-color: #667eea;
+    color: ${props => props.active ? 'white' : '#667eea'};
   }
 `;
 
-const StatsSection = styled.div`
-  background: #f0f0f0;
-  padding: 15px;
-  border: 2px inset #c0c0c0;
-  margin-top: 20px;
+const RangeInput = styled.input`
+  width: 80px;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.875rem;
+`;
+
+const StatsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-  text-align: center;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
 `;
 
 const StatItem = styled.div`
-  h3 {
-    margin: 0 0 10px 0;
-    color: #333;
+  text-align: center;
+  
+  .label {
+    font-size: 0.75rem;
+    color: #666;
+    margin-bottom: 0.25rem;
   }
   
   .value {
-    font-size: 24px;
-    font-weight: bold;
-    color: #4CAF50;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #333;
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 `;
 
-const ErrorMessage = styled.div`
-  background: #ff6b6b;
+const NetworkStatus = styled.div<{ connected?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: ${props => props.connected ? '#4CAF50' : '#ff6b6b'};
+  
+  &::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: ${props => props.connected ? '#4CAF50' : '#ff6b6b'};
+  }
+`;
+
+const WinMessage = styled.div`
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, #4CAF50, #45a049);
   color: white;
-  padding: 10px;
-  border-radius: 4px;
-  margin: 10px 0;
+  padding: 2rem;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(76, 175, 80, 0.4);
+  text-align: center;
+  z-index: 1000;
+  min-width: 300px;
+  
+  h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    font-weight: 700;
+  }
+  
+  p {
+    margin-bottom: 1.5rem;
+    opacity: 0.9;
+  }
+  
+  .buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+`;
+
+const Overlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+`;
+
+const GameModeToggle = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  
+  .toggle {
+    position: relative;
+    width: 48px;
+    height: 24px;
+    background: ${props => props.theme?.web3Mode ? '#667eea' : '#ccc'};
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    
+    &::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: ${props => props.theme?.web3Mode ? '26px' : '2px'};
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+  }
 `;
 
 const defaultGameConfig: GameConfig = {
-  width: 10,
-  height: 10,
-  mines: 15
+  width: 16,
+  height: 16,
+  mines: 40
 };
 
 const presets = {
@@ -157,20 +345,15 @@ const presets = {
   hard: { width: 30, height: 16, mines: 99 }
 };
 
-export default function Home() {
+export default function ModernMinesweeper() {
   const web3 = useWeb3();
   const gameContract = useGameContract(web3.signer, web3.account);
   const userProfile = useUserProfile(web3.account);
   const gameHistory = useGameHistory();
   
   const [mounted, setMounted] = useState(false);
-  
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-  
-  
   const [gameConfig, setGameConfig] = useState<GameConfig>(defaultGameConfig);
+  const [activePreset, setActivePreset] = useState<keyof typeof presets>('medium');
   const [gameState, setGameState] = useState<GameState>({
     board: createEmptyBoard(defaultGameConfig.width, defaultGameConfig.height),
     gameStatus: 'waiting',
@@ -185,173 +368,108 @@ export default function Home() {
   const [contractGameId, setContractGameId] = useState<number | null>(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [isSubmittingScore, setIsSubmittingScore] = useState(false);
-  const [flagMode, setFlagMode] = useState(false); // 手机端插旗模式
-  const [localGameMode, setLocalGameMode] = useState(false); // 本地游戏模式，不使用区块链
+  const [flagMode, setFlagMode] = useState(false);
+  const [localGameMode, setLocalGameMode] = useState(false); // 默认Web3模式
+  const [canClaimReward, setCanClaimReward] = useState(false);
+  const [isClaimingReward, setIsClaimingReward] = useState(false);
+  const [showWinMessage, setShowWinMessage] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState<ColorTheme>(DEFAULT_THEMES[0]);
+  const [showThemeSelector, setShowThemeSelector] = useState(false);
+  
+  // 加载保存的主题设置
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('minesweeper-theme');
+    if (savedTheme) {
+      try {
+        const theme = JSON.parse(savedTheme);
+        const foundTheme = DEFAULT_THEMES.find(t => t.id === theme.id);
+        if (foundTheme) {
+          setCurrentTheme(foundTheme);
+        }
+      } catch (error) {
+        console.error('加载主题设置失败:', error);
+      }
+    }
+  }, []);
+  
+  // 保存主题设置
+  const handleThemeChange = (theme: ColorTheme) => {
+    setCurrentTheme(theme);
+    localStorage.setItem('minesweeper-theme', JSON.stringify(theme));
+  };
 
-  // Timer effect
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Timer effect with real-time score calculation
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
     if (gameState.gameStatus === 'playing' && gameStartTime) {
       interval = setInterval(() => {
         const elapsed = Math.floor((Date.now() - gameStartTime) / 1000);
-        setGameState(prev => ({ ...prev, timeElapsed: elapsed }));
+        const currentScore = calculateScore(gameConfig, elapsed, gameState.flagCount);
+        setGameState(prev => ({ 
+          ...prev, 
+          timeElapsed: elapsed,
+          score: currentScore
+        }));
       }, 1000);
     }
     
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [gameState.gameStatus, gameStartTime]);
-
-  // 签名游戏结果
-  const signGameResult = async (gameId: number, score: number, timeElapsed: number): Promise<string | null> => {
-    if (!web3.signer) {
-      console.error('No signer available');
-      return null;
-    }
-
-    try {
-      const message = `gameId:${gameId},score:${score},time:${timeElapsed}`;
-      const signature = await web3.signer.signMessage(message);
-      return signature;
-    } catch (error) {
-      console.error('Failed to sign message:', error);
-      return null;
-    }
-  };
-
-  // 新的服务器签名奖励申请系统
-  const claimRewardWithSignature = async (
-    gameId: number,
-    score: number,
-    timeElapsed: number
-  ): Promise<boolean> => {
-    if (!web3.account || !web3.signer || isSubmittingScore) return false;
-
-    setIsSubmittingScore(true);
-    
-    try {
-      console.log('🎯 Starting server signature claim process...');
-      
-      // 1. 向服务器请求签名
-      const response = await fetch('/api/claim', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          player: web3.account,
-          gameId,
-          score,
-          duration: timeElapsed
-        })
-      });
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to get server signature');
-      }
-
-      console.log('✅ Server signature received:', result);
-
-      // 2. 使用服务器签名调用合约
-      if (!gameContract.contract) {
-        throw new Error('Contract not available');
-      }
-
-      const { claimData, serverSignature } = result;
-      
-      // 调用合约的 claimWithSignature 方法
-      const tx = await gameContract.contract.claimWithSignature(
-        claimData.player,
-        claimData.gameId,
-        claimData.score,
-        claimData.duration,
-        claimData.nonce,
-        claimData.deadline,
-        serverSignature
-      );
-
-      console.log('📝 Transaction sent:', tx.hash);
-      
-      // 等待交易确认
-      const receipt = await tx.wait();
-      console.log('✅ Transaction confirmed:', receipt.transactionHash);
-
-      // 刷新游戏统计
-      await gameContract.loadGameStats();
-      
-      console.log(`🎉 Reward claimed successfully! Estimated: ${result.estimatedReward} FMH`);
-      return true;
-      
-    } catch (error) {
-      console.error('❌ Failed to claim reward:', error);
-      throw error;
-    } finally {
-      setIsSubmittingScore(false);
-    }
-  };
-
-  // 存储玩家地址到 localStorage 用于排行榜
-  useEffect(() => {
-    if (web3.account) {
-      localStorage.setItem('playerAddress', web3.account);
-    }
-  }, [web3.account]);
+  }, [gameState.gameStatus, gameStartTime, gameState.flagCount, gameConfig]);
 
   const startNewGame = useCallback(async () => {
-    // Always initialize local game state first
     const newBoard = createEmptyBoard(gameConfig.width, gameConfig.height);
     
-    // Force re-render by using a functional update
-    setGameState(prev => ({
+    setGameState({
       board: newBoard,
-      gameStatus: 'waiting' as const,
+      gameStatus: 'waiting',
       mineCount: gameConfig.mines,  
       flagCount: 0,
       timeElapsed: 0,
       score: 0,
       gameId: undefined
-    }));
+    });
     
     setFirstClick(true);
     setGameStartTime(null);
     setContractGameId(null);
-
-    // Only try blockchain if not in local mode and wallet is connected
+    setCanClaimReward(false);
+    setShowWinMessage(false);
+    setIsSubmittingScore(false);
+    
+    // 如果是Web3模式且已连接钱包，启动链上游戏
     if (!localGameMode && web3.isConnected && gameContract.contractsReady) {
+      setIsSubmittingScore(true);
       try {
-        const timeoutPromise = new Promise<null>((_, reject) => 
-          setTimeout(() => reject(new Error('Blockchain timeout')), 5000)
-        );
-        
-        const gamePromise = gameContract.startGame(
-          gameConfig.width,
-          gameConfig.height, 
-          gameConfig.mines
-        );
-        
-        const blockchainGameId = await Promise.race([gamePromise, timeoutPromise]);
-        
-        if (blockchainGameId) {
-          setGameState(prev => ({ ...prev, gameId: blockchainGameId }));
-          setContractGameId(blockchainGameId);
+        console.log('🚀 正在启动链上游戏...', gameConfig);
+        const gameId = await gameContract.startGame(gameConfig.width, gameConfig.height, gameConfig.mines);
+        if (gameId !== null) {
+          setContractGameId(gameId);
+          console.log('✅ 链上游戏启动成功，游戏ID:', gameId);
+        } else {
+          console.log('⚠️ 链上游戏启动失败，切换到本地模式');
+          setLocalGameMode(true);
         }
       } catch (error) {
-        console.log('Blockchain game start failed, continuing with local game:', error);
-        // Continue with local game even if blockchain fails
+        console.error('启动链上游戏失败:', error);
+        setLocalGameMode(true);
+      } finally {
+        setIsSubmittingScore(false);
       }
     }
-  }, [gameConfig, web3.isConnected, gameContract, localGameMode]);
+  }, [gameConfig, localGameMode, web3.isConnected, gameContract]);
 
   const handleCellClick = useCallback((row: number, col: number) => {
     if (gameState.gameStatus === 'won' || gameState.gameStatus === 'lost') {
       return;
     }
 
-    // 在插旗模式下，点击=插旗
     if (flagMode && !firstClick) {
       const result = toggleFlag(gameState.board, row, col, gameConfig.mines, gameState.flagCount);
       setGameState(prev => ({ 
@@ -364,97 +482,67 @@ export default function Home() {
 
     let newBoard = [...gameState.board];
     
-    // First click - place mines and start game
     if (firstClick) {
       newBoard = placeMines(newBoard, gameConfig.mines, row, col);
       setFirstClick(false);
-      setGameStartTime(Date.now());
+      const startTime = Date.now();
+      setGameStartTime(startTime);
       setGameState(prev => ({ ...prev, gameStatus: 'playing', board: newBoard }));
+      
+      console.log('🎮 游戏开始！', {
+        mode: localGameMode ? 'Local' : 'Web3',
+        contractGameId,
+        config: gameConfig
+      });
     }
 
-    // Reveal cell
     newBoard = revealCell(newBoard, row, col);
     
-    // Check if clicked on mine
     if (newBoard[row][col].isMine) {
+      // 标记触发的地雷
+      newBoard = markTriggeredMine(newBoard, row, col);
+      // 显示所有地雷
+      newBoard = revealAllMines(newBoard);
+      
       setGameState(prev => ({ 
         ...prev, 
         board: newBoard, 
-        gameStatus: 'lost' 
+        gameStatus: 'lost',
+        showAllMines: true
       }));
       
-      // Complete blockchain game as lost
-      if (contractGameId) {
-        gameContract.completeGame(contractGameId, false, gameState.score);
+      // 如果是Web3模式且已连接钱包，完成链上游戏
+      if (!localGameMode && web3.isConnected && contractGameId !== null && gameContract.contractsReady) {
+        const finalScore = calculateScore(gameConfig, gameState.timeElapsed, gameState.flagCount);
+        handleGameComplete(contractGameId, false, finalScore);
       }
       return;
     }
 
-    // Check win condition
     const isWon = checkWinCondition(newBoard);
     if (isWon) {
+      // 获胜时也显示所有地雷
+      newBoard = revealAllMines(newBoard);
+      
       const finalScore = calculateScore(gameConfig, gameState.timeElapsed, gameState.flagCount);
       setGameState(prev => ({ 
         ...prev, 
         board: newBoard, 
         gameStatus: 'won',
-        score: finalScore
+        score: finalScore,
+        showAllMines: true
       }));
       
-      // 新的游戏完成流程：保存记录 + 检查成就 + 申请奖励
-      if (web3.isConnected) {
-        setTimeout(async () => {
-          try {
-            // 1. 保存游戏记录到数据库
-            const gameData = {
-              walletAddress: web3.account,
-              gameId: contractGameId || Date.now(), // 如果没有链上ID，使用时间戳
-              gameWidth: gameConfig.width,
-              gameHeight: gameConfig.height,
-              mineCount: gameConfig.mines,
-              isWon: true,
-              finalScore,
-              gameDuration: gameState.timeElapsed,
-              cellsRevealed: gameState.board.flat().filter(cell => cell.isRevealed).length,
-              flagsUsed: gameState.flagCount,
-              rewardAmount: 0, // 暂时设为0，申请成功后更新
-              rewardClaimed: false,
-              startTxHash: null,
-              completeTxHash: null,
-              gameFee: 0.001
-            };
-
-            const completionResult = await gameHistory.completeGame(gameData, userProfile.profile?.id);
-            
-            if (completionResult.gameSaved) {
-              console.log('✅ Game record saved to database');
-              
-              // 2. 显示新获得的成就
-              if (completionResult.achievements && completionResult.achievements.length > 0) {
-                console.log('🏆 New achievements unlocked:', completionResult.achievements);
-                // TODO: 显示成就弹窗
-              }
-              
-              // 3. 刷新用户资料
-              await userProfile.fetchProfile();
-            }
-
-            // 4. 申请链上奖励（如果有合约游戏ID）
-            if (contractGameId) {
-              await claimRewardWithSignature(contractGameId, finalScore, gameState.timeElapsed);
-              console.log('🎉 Blockchain reward automatically claimed!');
-            }
-            
-          } catch (error) {
-            console.error('❌ Game completion process failed:', error);
-            console.log('💡 You can manually claim the reward using the Claim Reward button');
-          }
-        }, 1000); // 延迟1秒以确保状态更新完成
+      setShowWinMessage(true);
+      
+      // 如果是Web3模式且已连接钱包，完成链上游戏
+      if (!localGameMode && web3.isConnected && contractGameId !== null && gameContract.contractsReady) {
+        handleGameComplete(contractGameId, true, finalScore);
       }
     } else {
       setGameState(prev => ({ ...prev, board: newBoard }));
     }
-  }, [gameState.board, gameState.gameStatus, gameState.timeElapsed, gameState.flagCount, firstClick, gameConfig, contractGameId, gameContract.completeGame, web3.isConnected, web3.account, claimRewardWithSignature, gameHistory, userProfile, flagMode]);
+  }, [gameState.board, gameState.gameStatus, gameState.timeElapsed, gameState.flagCount, firstClick, gameConfig, flagMode]);
 
   const handleCellRightClick = useCallback((row: number, col: number) => {
     if (gameState.gameStatus === 'won' || gameState.gameStatus === 'lost' || firstClick) {
@@ -470,26 +558,59 @@ export default function Home() {
     }));
   }, [gameState.board, gameState.gameStatus, gameState.flagCount, firstClick, gameConfig.mines]);
 
-  // 手动申请奖励（使用服务器签名）
-  const handleClaimReward = async () => {
-    if (!contractGameId || gameState.gameStatus !== 'won') {
-      console.error('Cannot claim reward: invalid game state');
+  // 处理游戏完成和奖励申请
+  const handleGameComplete = useCallback(async (gameId: number, won: boolean, score: number) => {
+    if (!gameContract.contractsReady) {
+      console.log('⚠️ 合约未准备好，跳过链上操作');
       return;
     }
 
+    setIsSubmittingScore(true);
     try {
-      await claimRewardWithSignature(contractGameId, gameState.score, gameState.timeElapsed);
+      console.log('🔄 正在完成链上游戏...', { gameId, won, score });
+      const success = await gameContract.completeGame(gameId, won, score);
+      if (success && won) {
+        setCanClaimReward(true);
+        console.log('✅ 游戏完成，可以申请奖励！');
+      }
     } catch (error) {
-      console.error('Failed to claim reward:', error);
-      alert('Failed to claim reward. Please try again.');
+      console.error('完成游戏失败:', error);
+    } finally {
+      setIsSubmittingScore(false);
     }
-  };
+  }, [gameContract]);
+
+  // 申请奖励
+  const handleClaimReward = useCallback(async () => {
+    if (!contractGameId || !gameContract.contractsReady) {
+      console.log('⚠️ 没有游戏ID或合约未准备好');
+      return;
+    }
+
+    setIsClaimingReward(true);
+    try {
+      console.log('💰 正在申请奖励...', contractGameId);
+      const success = await gameContract.claimReward(contractGameId);
+      if (success) {
+        setCanClaimReward(false);
+        setShowWinMessage(false);
+        console.log('✅ 奖励申请成功！');
+        
+        // 刷新用户统计
+        await gameContract.loadGameStats();
+      }
+    } catch (error) {
+      console.error('申请奖励失败:', error);
+    } finally {
+      setIsClaimingReward(false);
+    }
+  }, [contractGameId, gameContract]);
 
   const setPreset = (preset: keyof typeof presets) => {
     const config = presets[preset];
     setGameConfig(config);
+    setActivePreset(preset);
     
-    // Reset board with new dimensions
     const newBoard = createEmptyBoard(config.width, config.height);
     setGameState({
       board: newBoard,
@@ -502,205 +623,269 @@ export default function Home() {
     setFirstClick(true);
     setGameStartTime(null);
     setContractGameId(null);
+    setCanClaimReward(false);
+    setShowWinMessage(false);
   };
 
-  const handleShowLeaderboard = () => {
-    setShowLeaderboard(true);
-  };
-
-  const handleCloseLeaderboard = () => {
-    setShowLeaderboard(false);
-  };
+  if (!mounted) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <AppContainer>
-      <GameContainer>
-        <h1 style={{ textAlign: 'center', marginBottom: '20px' }}>
-          FMH Minesweeper
-        </h1>
-
-        <WalletSection>
-          {!web3.isConnected ? (
-            <div>
-              <p>Connect your wallet to earn FMH tokens!</p>
-              <ConnectButton 
-                onClick={web3.connectWallet} 
-                disabled={web3.isLoading}
-              >
-                {web3.isLoading ? (
-                  <>
-                    <span>🔄</span> Connecting...
-                  </>
+      <Header>
+        <HeaderContent>
+          <Logo>🎮 FMH 扫雷</Logo>
+          
+          <WalletSection>
+            <GameModeToggle theme={{ web3Mode: !localGameMode }}>
+              <span>Web3</span>
+              <div 
+                className="toggle" 
+                onClick={() => setLocalGameMode(!localGameMode)}
+                title={localGameMode ? '切换到Web3模式' : '切换到本地模式'}
+              />
+            </GameModeToggle>
+            
+            {!localGameMode && (
+              <>
+                <NetworkStatus connected={web3.isOnCorrectNetwork}>
+                  {web3.isOnCorrectNetwork ? 'Monad 测试网' : '网络未连接'}
+                </NetworkStatus>
+                
+                {!web3.isConnected ? (
+                  <WalletButton 
+                    variant="primary" 
+                    onClick={web3.connectWallet}
+                    disabled={web3.isLoading}
+                  >
+                    {web3.isLoading ? '连接中...' : '🔗 连接钱包'}
+                  </WalletButton>
                 ) : (
                   <>
-                    <span>🔗</span> Connect Wallet
+                    <WalletInfo>
+                      <span>💳 {web3.account?.slice(0, 6)}...{web3.account?.slice(-4)}</span>
+                    </WalletInfo>
+                    <WalletButton variant="secondary" onClick={web3.disconnect}>
+                      断开连接
+                    </WalletButton>
                   </>
                 )}
-              </ConnectButton>
-              
-              {web3.isLoading && (
-                <div style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
-                  Please check MetaMask popup
-                </div>
-              )}
-              
-              {/* Enhanced error handling with user-friendly solutions */}
-              <WalletErrorHelper
-                error={web3.error}
-                onRetry={web3.connectWallet}
-                onDismiss={web3.clearError}
+              </>
+            )}
+          </WalletSection>
+        </HeaderContent>
+      </Header>
+
+      <MainContent>
+        <GameArea>
+          <GameContent>
+            <GameHeader
+              mineCount={gameState.mineCount}
+              flagCount={gameState.flagCount}
+              timeElapsed={gameState.timeElapsed}
+              gameStatus={gameState.gameStatus}
+              score={gameState.score}
+              onNewGame={startNewGame}
+              onClaimReward={canClaimReward ? handleClaimReward : undefined}
+              canClaimReward={canClaimReward && !isClaimingReward}
+              onShowLeaderboard={() => setShowLeaderboard(true)}
+              flagMode={flagMode}
+              onToggleFlagMode={() => setFlagMode(!flagMode)}
+            />
+
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
+              <GameBoard
+                key={`${gameConfig.width}-${gameConfig.height}-${gameState.mineCount}-${gameState.gameStatus}`}
+                board={gameState.board}
+                onCellClick={handleCellClick}
+                onCellRightClick={handleCellRightClick}
+                gameStatus={gameState.gameStatus}
+                flagMode={flagMode}
+                colorTheme={currentTheme}
+                showAllMines={gameState.showAllMines}
               />
             </div>
-          ) : (
-            <div>
-              <p>Connected: {web3.account?.slice(0, 6)}...{web3.account?.slice(-4)}</p>
-              {!web3.isOnCorrectNetwork && (
-                <NetworkWarning>
-                  Please switch to Monad Testnet to earn rewards
-                  <ConnectButton onClick={web3.switchToMonadTestnet}>
-                    Switch Network
-                  </ConnectButton>
-                </NetworkWarning>
-              )}
-              <ConnectButton onClick={web3.disconnect}>
-                Disconnect
-              </ConnectButton>
-            </div>
+          </GameContent>
+        </GameArea>
+
+        <Sidebar>
+          <Card>
+            <CardHeader>游戏设置</CardHeader>
+            <CardContent>
+              <GameSettings>
+                <div>
+                  <Label>难度预设</Label>
+                  <PresetButtons>
+                    <PresetButton 
+                      active={activePreset === 'easy'}
+                      onClick={() => setPreset('easy')}
+                    >
+                      简单
+                    </PresetButton>
+                    <PresetButton 
+                      active={activePreset === 'medium'}
+                      onClick={() => setPreset('medium')}
+                    >
+                      中等
+                    </PresetButton>
+                    <PresetButton 
+                      active={activePreset === 'hard'}
+                      onClick={() => setPreset('hard')}
+                    >
+                      困难
+                    </PresetButton>
+                  </PresetButtons>
+                </div>
+                
+                <SettingRow>
+                  <Label>主题设置</Label>
+                  <WalletButton 
+                    variant="secondary"
+                    onClick={() => setShowThemeSelector(true)}
+                    style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}
+                  >
+                    🎨 {currentTheme.name}
+                  </WalletButton>
+                </SettingRow>
+
+                <SettingRow>
+                  <Label>宽度</Label>
+                  <RangeInput 
+                    type="number" 
+                    min="5" 
+                    max="30" 
+                    value={gameConfig.width}
+                    onChange={(e) => setGameConfig(prev => ({ ...prev, width: parseInt(e.target.value) || 5 }))}
+                  />
+                </SettingRow>
+
+                <SettingRow>
+                  <Label>高度</Label>
+                  <RangeInput 
+                    type="number" 
+                    min="5" 
+                    max="30" 
+                    value={gameConfig.height}
+                    onChange={(e) => setGameConfig(prev => ({ ...prev, height: parseInt(e.target.value) || 5 }))}
+                  />
+                </SettingRow>
+
+                <SettingRow>
+                  <Label>地雷数</Label>
+                  <RangeInput 
+                    type="number" 
+                    min="1" 
+                    max={Math.floor(gameConfig.width * gameConfig.height * 0.8)}
+                    value={gameConfig.mines}
+                    onChange={(e) => setGameConfig(prev => ({ ...prev, mines: parseInt(e.target.value) || 1 }))}
+                  />
+                </SettingRow>
+              </GameSettings>
+            </CardContent>
+          </Card>
+
+          {!localGameMode && web3.isConnected && userProfile.profile && (
+            <Card>
+              <CardHeader>游戏统计</CardHeader>
+              <CardContent>
+                <StatsGrid>
+                  <StatItem>
+                    <div className="label">总胜利</div>
+                    <div className="value">{userProfile.stats?.totalWins || 0}</div>
+                  </StatItem>
+                  <StatItem>
+                    <div className="label">最高分</div>
+                    <div className="value">{userProfile.stats?.bestScore || 0}</div>
+                  </StatItem>
+                  <StatItem>
+                    <div className="label">FMH 代币</div>
+                    <div className="value">{parseFloat(userProfile.stats?.totalRewards || '0').toFixed(1)}</div>
+                  </StatItem>
+                  <StatItem>
+                    <div className="label">成就数</div>
+                    <div className="value">{userProfile.stats?.achievementCount || 0}</div>
+                  </StatItem>
+                </StatsGrid>
+              </CardContent>
+            </Card>
           )}
-          {gameContract.error && <ErrorMessage>{gameContract.error}</ErrorMessage>}
-        </WalletSection>
-
-        {/* 网络状态和指导 */}
-        <NetworkStatus />
-        <NetworkGuide />
-
-        <GameSettings>
-          <h3>Game Settings</h3>
-          <div>
-            <PresetButton onClick={() => setPreset('easy')}>Easy (9×9)</PresetButton>
-            <PresetButton onClick={() => setPreset('medium')}>Medium (16×16)</PresetButton>
-            <PresetButton onClick={() => setPreset('hard')}>Hard (30×16)</PresetButton>
-          </div>
           
-          <SettingRow>
-            <Label>Game Mode:</Label>
-            <PresetButton 
-              onClick={() => setLocalGameMode(!localGameMode)}
-              style={{ 
-                background: localGameMode ? '#ff9800' : '#4CAF50',
-                color: 'white' 
-              }}
-            >
-              {localGameMode ? '🏠 Local Mode' : '⛓️ Blockchain Mode'}
-            </PresetButton>
-          </SettingRow>
-          
-          <SettingRow>
-            <Label>Width:</Label>
-            <Input 
-              type="number" 
-              min="5" 
-              max="30" 
-              value={gameConfig.width}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGameConfig(prev => ({ ...prev, width: parseInt(e.target.value) || 5 }))}
-            />
-            <Label>Height:</Label>
-            <Input 
-              type="number" 
-              min="5" 
-              max="30" 
-              value={gameConfig.height}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGameConfig(prev => ({ ...prev, height: parseInt(e.target.value) || 5 }))}
-            />
-            <Label>Mines:</Label>
-            <Input 
-              type="number" 
-              min="1" 
-              max={Math.floor(gameConfig.width * gameConfig.height * 0.8)}
-              value={gameConfig.mines}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGameConfig(prev => ({ ...prev, mines: parseInt(e.target.value) || 1 }))}
-            />
-          </SettingRow>
-        </GameSettings>
+          {localGameMode && (
+            <Card>
+              <CardHeader>本地模式</CardHeader>
+              <CardContent>
+                <StatsGrid>
+                  <StatItem>
+                    <div className="label">当前分数</div>
+                    <div className="value">{gameState.score}</div>
+                  </StatItem>
+                  <StatItem>
+                    <div className="label">游戏状态</div>
+                    <div className="value">{gameState.gameStatus === 'won' ? '胜利' : gameState.gameStatus === 'lost' ? '失败' : gameState.gameStatus === 'playing' ? '游戏中' : '等待'}</div>
+                  </StatItem>
+                </StatsGrid>
+              </CardContent>
+            </Card>
+          )}
 
-        <GameHeader
-          mineCount={gameState.mineCount}
-          flagCount={gameState.flagCount}
-          timeElapsed={gameState.timeElapsed}
-          gameStatus={gameState.gameStatus}
-          score={gameState.score}
-          onNewGame={startNewGame}
-          onClaimReward={handleClaimReward}
-          canClaimReward={
-            web3.isConnected && 
-            web3.isOnCorrectNetwork && 
-            contractGameId !== null && 
-            gameState.gameStatus === 'won'
-          }
-          onShowLeaderboard={handleShowLeaderboard}
-          flagMode={flagMode}
-          onToggleFlagMode={() => setFlagMode(!flagMode)}
-        />
-
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-          <GameBoard
-            key={`${gameConfig.width}-${gameConfig.height}-${gameState.mineCount}-${gameState.gameStatus}`}
-            board={gameState.board}
-            onCellClick={handleCellClick}
-            onCellRightClick={handleCellRightClick}
-            gameStatus={gameState.gameStatus}
-            flagMode={flagMode}
-          />
-        </div>
-
-        {web3.isConnected && userProfile.profile && (
-          <StatsSection>
-            <StatItem>
-              <h3>游戏胜利</h3>
-              <div className="value">{userProfile.stats?.totalWins || 0}</div>
-              <div style={{ fontSize: '12px', color: '#666' }}>
-                胜率: {userProfile.stats?.winRate || 0}%
-              </div>
-            </StatItem>
-            <StatItem>
-              <h3>最高分数</h3>
-              <div className="value">{userProfile.stats?.bestScore || 0}</div>
-              <div style={{ fontSize: '12px', color: '#666' }}>
-                最快: {userProfile.stats?.bestTime || 0}秒
-              </div>
-            </StatItem>
-            <StatItem>
-              <h3>FMH 代币</h3>
-              <div className="value">{parseFloat(userProfile.stats?.totalRewards || 0).toFixed(2)}</div>
-              <div style={{ fontSize: '12px', color: '#666' }}>
-                成就: {userProfile.stats?.achievementCount || 0}个
-              </div>
-            </StatItem>
-          </StatsSection>
-        )}
-        
-        {/* 加载状态显示 */}
-        {(userProfile.loading || gameHistory.saving) && (
-          <div style={{ 
-            textAlign: 'center', 
-            padding: '10px', 
-            background: '#fff3cd', 
-            border: '1px solid #ffeaa7',
-            borderRadius: '4px',
-            margin: '10px 0',
-            fontSize: '14px'
-          }}>
-            {userProfile.loading && '📊 加载用户数据...'}
-            {gameHistory.saving && '💾 保存游戏记录...'}
-          </div>
-        )}
-      </GameContainer>
+          <Card>
+            <CardHeader>排行榜</CardHeader>
+            <CardContent>
+              <WalletButton 
+                variant="secondary" 
+                onClick={() => setShowLeaderboard(true)}
+                style={{ width: '100%' }}
+              >
+                📊 查看排行榜
+              </WalletButton>
+            </CardContent>
+          </Card>
+        </Sidebar>
+      </MainContent>
       
       <Leaderboard 
         isVisible={showLeaderboard} 
-        onClose={handleCloseLeaderboard} 
+        onClose={() => setShowLeaderboard(false)} 
       />
       
+      {showWinMessage && (
+        <>
+          <Overlay onClick={() => setShowWinMessage(false)} />
+          <WinMessage>
+            <h2>🎉 恭喜获胜！</h2>
+            <p>
+              您的分数: <strong>{gameState.score}</strong><br/>
+              用时: <strong>{Math.floor(gameState.timeElapsed / 60)}:{(gameState.timeElapsed % 60).toString().padStart(2, '0')}</strong><br/>
+              {!localGameMode && canClaimReward && '🎁 您可以申请 FMH 代币奖励！'}
+            </p>
+            <div className="buttons">
+              {!localGameMode && canClaimReward && (
+                <WalletButton 
+                  variant="primary" 
+                  onClick={handleClaimReward}
+                  disabled={isClaimingReward}
+                >
+                  {isClaimingReward ? '申请中...' : '💰 申请奖励'}
+                </WalletButton>
+              )}
+              <WalletButton variant="secondary" onClick={startNewGame}>
+                🎮 新游戏
+              </WalletButton>
+              <WalletButton variant="outline" onClick={() => setShowWinMessage(false)}>
+                关闭
+              </WalletButton>
+            </div>
+          </WinMessage>
+        </>
+      )}
+      
+      <ThemeSelector
+        currentTheme={currentTheme}
+        onThemeChange={handleThemeChange}
+        onClose={() => setShowThemeSelector(false)}
+        isVisible={showThemeSelector}
+      />
     </AppContainer>
   );
 }

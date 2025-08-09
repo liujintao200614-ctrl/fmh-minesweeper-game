@@ -141,6 +141,7 @@ export const withPerformanceMonitoring = <P extends object>(
 ) => {
   const displayName = componentName || Component.displayName || Component.name;
   
+  const React = require('react');
   return React.memo((props: P) => {
     React.useEffect(() => {
       PerformanceMonitor.startTimer(`${displayName}_render`);

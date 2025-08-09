@@ -1,12 +1,46 @@
 import { useState, useEffect, useCallback } from 'react';
 
-export function useUserProfile(walletAddress) {
-    const [profile, setProfile] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+interface UserProfile {
+    id: number;
+    wallet_address: string;
+    username?: string;
+    total_games: number;
+    total_wins: number;
+    best_score: number;
+    best_time: number;
+    total_rewards_earned: number;
+    achievement_count: number;
+    created_at: string;
+    updated_at: string;
+}
+
+interface UserStats {
+    totalGames: number;
+    totalWins: number;
+    winRate: string;
+    bestScore: number;
+    bestTime: number;
+    totalRewards: number;
+    achievementCount: number;
+}
+
+interface UseUserProfileReturn {
+    profile: UserProfile | null;
+    loading: boolean;
+    error: string | null;
+    registerUser: (userData?: Record<string, any>) => Promise<UserProfile | null>;
+    fetchProfile: () => Promise<void>;
+    updateProfile: (updates: Record<string, any>) => Promise<boolean>;
+    stats: UserStats | null;
+}
+
+export function useUserProfile(walletAddress: string | null): UseUserProfileReturn {
+    const [profile, setProfile] = useState<UserProfile | null>(null);
+    const [loading, setLoading] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
 
     // 注册用户
-    const registerUser = useCallback(async (userData = {}) => {
+    const registerUser = useCallback(async (userData: Record<string, any> = {}): Promise<UserProfile | null> => {
         if (!walletAddress) return null;
 
         setLoading(true);
@@ -32,7 +66,7 @@ export function useUserProfile(walletAddress) {
             } else {
                 throw new Error(result.error || 'Failed to register user');
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('❌ User registration error:', error);
             setError(error.message);
             return null;
@@ -42,7 +76,7 @@ export function useUserProfile(walletAddress) {
     }, [walletAddress]);
 
     // 获取用户详细资料
-    const fetchProfile = useCallback(async () => {
+    const fetchProfile = useCallback(async (): Promise<void> => {
         if (!walletAddress) return;
 
         setLoading(true);
@@ -66,7 +100,7 @@ export function useUserProfile(walletAddress) {
             } else {
                 throw new Error(result.error || 'Failed to fetch profile');
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('❌ Profile fetch error:', error);
             setError(error.message);
         } finally {
@@ -75,7 +109,7 @@ export function useUserProfile(walletAddress) {
     }, [walletAddress, registerUser]);
 
     // 更新用户资料
-    const updateProfile = useCallback(async (updates) => {
+    const updateProfile = useCallback(async (updates: Record<string, any>): Promise<boolean> => {
         if (!walletAddress) return false;
 
         setLoading(true);
@@ -100,7 +134,7 @@ export function useUserProfile(walletAddress) {
             } else {
                 throw new Error(result.error || 'Failed to update profile');
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('❌ Profile update error:', error);
             setError(error.message);
             return false;

@@ -1,4 +1,4 @@
-import { getDatabase } from '../../../lib/database';
+const { getDatabase } = require('../../../lib/database');
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {

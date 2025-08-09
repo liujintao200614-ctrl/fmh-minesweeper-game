@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FMH扫雷 - 调试测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f0f2f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover { background: #45a049; }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>🎯 FMH扫雷游戏 - 系统调试</h1>
+    
+    <div class="test-section">
+        <h2>🔗 API连接测试</h2>
+        <button onclick="testAPI('/api/test', 'test-result')">测试基础API</button>
+        <button onclick="testAPI('/api/leaderboard', 'leaderboard-result')">测试排行榜API</button>
+        <button onclick="testAPI('/api/users/profile?walletAddress=0x123', 'profile-result')">测试用户资料API</button>
+        <div id="test-result" class="result info">点击按钮测试API...</div>
+        <div id="leaderboard-result" class="result info">等待测试...</div>
+        <div id="profile-result" class="result info">等待测试...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>🌐 网络信息</h2>
+        <div id="network-info" class="result info">正在检测...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>🎮 游戏链接</h2>
+        <button onclick="window.open('http://localhost:5173', '_blank')">打开扫雷游戏</button>
+        <button onclick="window.open('http://localhost:3000/api/test', '_blank')">直接访问API</button>
+    </div>
+
+    <script>
+        // 显示网络信息
+        document.getElementById('network-info').textContent = 
+            `当前页面: ${window.location.href}\n` +
+            `用户代理: ${navigator.userAgent}\n` +
+            `时间: ${new Date().toLocaleString()}`;
+
+        // API测试函数
+        async function testAPI(endpoint, resultId) {
+            const resultDiv = document.getElementById(resultId);
+            resultDiv.textContent = `🔄 正在测试 ${endpoint}...`;
+            resultDiv.className = 'result info';
+
+            try {
+                const startTime = Date.now();
+                const response = await fetch(endpoint, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const duration = Date.now() - startTime;
+                const contentType = response.headers.get('content-type');
+                
+                let result = `✅ 状态: ${response.status} ${response.statusText}\n`;
+                result += `⏱️ 响应时间: ${duration}ms\n`;
+                result += `📄 内容类型: ${contentType}\n\n`;
+
+                if (response.ok) {
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        result += `📦 JSON响应:\n${JSON.stringify(data, null, 2)}`;
+                        resultDiv.className = 'result success';
+                    } else {
+                        const text = await response.text();
+                        result += `📄 文本响应 (前500字符):\n${text.substring(0, 500)}`;
+                        resultDiv.className = 'result error';
+                    }
+                } else {
+                    const errorText = await response.text();
+                    result += `❌ 错误响应:\n${errorText}`;
+                    resultDiv.className = 'result error';
+                }
+
+                resultDiv.textContent = result;
+
+            } catch (error) {
+                resultDiv.textContent = `❌ 网络错误: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        // 自动测试
+        setTimeout(() => {
+            testAPI('/api/test', 'test-result');
+        }, 1000);
+
+        setTimeout(() => {
+            testAPI('/api/leaderboard', 'leaderboard-result');
+        }, 2000);
+    </script>
+</body>
+</html>

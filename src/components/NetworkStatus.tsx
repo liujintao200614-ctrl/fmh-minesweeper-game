@@ -65,6 +65,13 @@ const NetworkStatus: React.FC = () => {
   const checkNetwork = async () => {
     setIsChecking(true);
     try {
+      // 检查是否在浏览器环境且有ethereum对象
+      if (typeof window === 'undefined' || !(window as any).ethereum) {
+        setIsOnCorrectNetwork(false);
+        setIsChecking(false);
+        return;
+      }
+      
       const correct = await isOnMonadTestnet();
       setIsOnCorrectNetwork(correct);
       
@@ -96,7 +103,10 @@ const NetworkStatus: React.FC = () => {
   };
 
   useEffect(() => {
-    checkNetwork();
+    // 延迟检查，确保MetaMask已注入
+    const delayedCheck = setTimeout(() => {
+      checkNetwork();
+    }, 1000);
 
     // 监听网络变化
     if (typeof window !== 'undefined' && (window as any).ethereum) {
@@ -106,9 +116,14 @@ const NetworkStatus: React.FC = () => {
 
       (window as any).ethereum.on('chainChanged', handleChainChanged);
       return () => {
+        clearTimeout(delayedCheck);
         (window as any).ethereum.removeListener('chainChanged', handleChainChanged);
       };
     }
+
+    return () => {
+      clearTimeout(delayedCheck);
+    };
   }, []);
 
   return (

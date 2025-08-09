@@ -1,6 +1,7 @@
+const { getDatabase } = require('../../../lib/database');
+
 export default async function handler(req, res) {
     try {
-        const { getDatabase } = require('../../lib/database');
         const { walletAddress } = req.query;
 
         if (!walletAddress) {

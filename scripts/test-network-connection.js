@@ -10,13 +10,18 @@ async function testNetworkConnection() {
         // 1. 测试RPC连接
         console.log('📡 测试RPC连接...');
         const rpcUrl = 'https://testnet-rpc.monad.xyz';
-        const provider = new ethers.JsonRpcProvider(rpcUrl);
+        const provider = new ethers.JsonRpcProvider(rpcUrl, {
+            name: 'Monad Testnet',
+            chainId: 10143,
+            ensAddress: null, // 禁用 ENS 解析
+        });
         
-        // 获取网络信息
-        const network = await provider.getNetwork();
+        // 获取网络信息 - 使用直接 RPC 调用避免 ENS
+        const chainIdHex = await provider.send('eth_chainId', []);
+        const chainId = parseInt(chainIdHex, 16);
         console.log('✅ RPC连接成功');
-        console.log(`   链ID: ${network.chainId} (0x${network.chainId.toString(16)})`);
-        console.log(`   链名: ${network.name || 'unknown'}`);
+        console.log(`   链ID: ${chainId} (0x${chainId.toString(16)})`);
+        console.log(`   链名: Monad Testnet`);
         
         // 2. 获取区块信息
         console.log('\n📦 获取最新区块...');

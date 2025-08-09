@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { NetworkManager } from '../utils/network';
+import { connectMetaMaskSafely } from '../utils/waitForEthereum';
 
 interface Web3State {
   provider: ethers.BrowserProvider | null;
@@ -26,6 +27,7 @@ export const useWeb3 = () => {
   const MONAD_TESTNET_CHAIN_ID = parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || '10143');
 
   const connectWallet = useCallback(async () => {
+    console.log('🔄 Starting enhanced wallet connection...');
     setWeb3State(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
@@ -33,24 +35,8 @@ export const useWeb3 = () => {
         throw new Error('This application must run in a browser');
       }
 
-      const ethereum = (window as any).ethereum;
-      if (!ethereum) {
-        throw new Error('MetaMask not detected. Please install MetaMask browser extension.');
-      }
-
-      // 检查MetaMask是否可用
-      if (!ethereum.isMetaMask) {
-        throw new Error('Please use MetaMask wallet to connect.');
-      }
-
-      // 请求连接账户
-      const accounts = await ethereum.request({
-        method: 'eth_requestAccounts',
-      });
-
-      if (!accounts || accounts.length === 0) {
-        throw new Error('No wallet accounts available. Please unlock your wallet.');
-      }
+      // 使用新的安全连接方法
+      const { ethereum, accounts } = await connectMetaMaskSafely();
 
       // 创建provider和signer，禁用 ENS 解析
       const provider = new ethers.BrowserProvider(ethereum, {
@@ -64,7 +50,7 @@ export const useWeb3 = () => {
       const currentChainId = await ethereum.request({ method: 'eth_chainId' });
       const numericChainId = parseInt(currentChainId, 16);
 
-      console.log('Wallet connected successfully:', {
+      console.log('✅ Wallet connected successfully:', {
         account: accounts[0],
         chainId: numericChainId,
         networkName: 'Monad Testnet'
@@ -81,24 +67,15 @@ export const useWeb3 = () => {
       });
 
     } catch (error: any) {
-      let errorMessage = 'Failed to connect wallet';
-      
-      // 更详细的错误处理
-      if (error.code === 4001) {
-        errorMessage = 'Connection request was rejected. Please try again.';
-      } else if (error.code === -32002) {
-        errorMessage = 'Connection request is pending. Please check MetaMask and approve the connection.';
-      } else if (error.code === -32603) {
-        errorMessage = 'Internal error occurred. Please try refreshing the page.';
-      } else if (error.message?.includes('not detected')) {
-        errorMessage = 'MetaMask not detected. Please install MetaMask browser extension.';
-      } else if (error.message?.includes('unlock')) {
-        errorMessage = 'Please unlock your MetaMask wallet first.';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
+      console.error('🚫 Enhanced wallet connection failed:', error);
 
-      console.error('Wallet connection failed:', error);
+      // 使用从 waitForEthereum 传递过来的错误信息，或添加兜底处理
+      let errorMessage = error.message || 'Failed to connect wallet';
+      
+      // 确保错误信息包含有用的指导
+      if (!errorMessage.includes('MetaMask') && !errorMessage.includes('extension')) {
+        errorMessage += '\n\nPlease ensure:\n• MetaMask extension is installed and enabled\n• You approve the connection request\n• Your wallet is unlocked';
+      }
 
       setWeb3State(prev => ({
         ...prev,
@@ -196,6 +173,31 @@ export const useWeb3 = () => {
   const clearError = useCallback(() => {
     setWeb3State(prev => ({ ...prev, error: null }));
   }, []);
+
+  // 检查是否已连接并自动连接 - 使用新的等待逻辑
+  const checkConnection = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      // 等待 ethereum 对象注入，但设置较短的超时时间用于自动连接检查
+      const { waitForEthereum } = await import('../utils/waitForEthereum');
+      const ethereum = await waitForEthereum(3000); // 3秒超时
+      
+      const accounts = await ethereum.request({ method: 'eth_accounts' });
+      if (accounts && accounts.length > 0) {
+        console.log('🔄 Auto-reconnecting to existing session...');
+        await connectWallet();
+      }
+    } catch (error) {
+      // 自动连接失败不是致命错误，只记录日志
+      console.log('ℹ️ Auto-connection check completed (no existing connection found)');
+    }
+  }, [connectWallet]);
+
+  // 页面加载时检查连接状态
+  useEffect(() => {
+    checkConnection();
+  }, [checkConnection]);
 
   // 设置事件监听器
   useEffect(() => {

@@ -13,6 +13,12 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // 移动端优化
+  experimental: {
+    optimizePackageImports: ['ethers', 'styled-components'],
+  },
+  // 压缩优化
+  compress: true,
   // 生产环境优化 (暂时禁用CSS优化避免构建问题)
   // experimental: {
   //   optimizeCss: true,
@@ -25,7 +31,7 @@ const nextConfig = {
         headers: [
           {
             key: 'X-Frame-Options',
-            value: 'DENY',
+            value: 'SAMEORIGIN',
           },
           {
             key: 'X-Content-Type-Options',
@@ -38,6 +44,25 @@ const nextConfig = {
           {
             key: 'X-XSS-Protection',
             value: '1; mode=block',
+          },
+          // 移动端缓存优化
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+          // 允许 MetaMask 和其他钱包扩展
+          {
+            key: 'Content-Security-Policy',
+            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https: wss: data:; img-src 'self' data: https:; object-src 'none';",
+          },
+        ],
+      },
+      {
+        source: '/api/(.*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
           },
         ],
       },

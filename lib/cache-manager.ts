@@ -11,6 +11,9 @@ class CacheManager {
   private memoryCache = new Map<string, CacheEntry<any>>();
   private readonly defaultTTL = 5 * 60 * 1000; // 5分钟
   private readonly maxMemorySize = 1000; // 最大缓存条目数
+  private totalHits = 0;
+  private totalMisses = 0;
+  private accessTimes = new Map<string, number>(); // 访问时间记录（用于LRU）
 
   static getInstance(): CacheManager {
     if (!this.instance) {
@@ -32,9 +35,9 @@ class CacheManager {
     const now = Date.now();
     const expiresAt = now + ttl;
 
-    // 如果缓存已满，清理最旧的条目
+    // 如果缓存已满，使用LRU策略清理
     if (this.memoryCache.size >= this.maxMemorySize) {
-      this.cleanup();
+      this.evictLRU();
     }
 
     this.memoryCache.set(key, {
@@ -42,6 +45,9 @@ class CacheManager {
       timestamp: now,
       expiresAt
     });
+    
+    // 记录访问时间
+    this.accessTimes.set(key, now);
   }
 
   // 获取缓存
@@ -49,21 +55,52 @@ class CacheManager {
     const entry = this.memoryCache.get(key);
     
     if (!entry) {
+      this.totalMisses++;
       return null;
     }
 
     // 检查是否过期
     if (Date.now() > entry.expiresAt) {
       this.memoryCache.delete(key);
+      this.accessTimes.delete(key);
+      this.totalMisses++;
       return null;
     }
 
+    // 记录访问时间（LRU）
+    this.accessTimes.set(key, Date.now());
+    this.totalHits++;
+    
     return entry.data as T;
   }
 
   // 删除缓存
   delete(key: string): boolean {
+    this.accessTimes.delete(key);
     return this.memoryCache.delete(key);
+  }
+
+  // LRU淘汰策略
+  private evictLRU(): void {
+    let oldestKey = '';
+    let oldestTime = Date.now();
+    
+    // 首先清理过期的条目
+    this.cleanup();
+    
+    // 如果还是满了，找到最久未访问的条目
+    if (this.memoryCache.size >= this.maxMemorySize) {
+      for (const [key, time] of this.accessTimes.entries()) {
+        if (time < oldestTime) {
+          oldestTime = time;
+          oldestKey = key;
+        }
+      }
+      
+      if (oldestKey) {
+        this.delete(oldestKey);
+      }
+    }
   }
 
   // 清理过期缓存
@@ -72,6 +109,7 @@ class CacheManager {
     for (const [key, entry] of this.memoryCache.entries()) {
       if (now > entry.expiresAt) {
         this.memoryCache.delete(key);
+        this.accessTimes.delete(key);
       }
     }
   }
@@ -79,6 +117,41 @@ class CacheManager {
   // 清空所有缓存
   clear(): void {
     this.memoryCache.clear();
+    this.accessTimes.clear();
+    this.totalHits = 0;
+    this.totalMisses = 0;
+  }
+
+  // 预热缓存
+  async warmup(keys: string[], dataLoader: (key: string) => Promise<any>): Promise<void> {
+    const promises = keys.map(async (key) => {
+      try {
+        const data = await dataLoader(key);
+        this.set(key, data);
+      } catch (error) {
+        console.warn(`Failed to warm up cache for key: ${key}`, error);
+      }
+    });
+    
+    await Promise.allSettled(promises);
+  }
+
+  // 批量获取
+  mget<T>(keys: string[]): Map<string, T | null> {
+    const results = new Map<string, T | null>();
+    
+    for (const key of keys) {
+      results.set(key, this.get<T>(key));
+    }
+    
+    return results;
+  }
+
+  // 批量设置
+  mset<T>(entries: Array<[string, T, number?]>): void {
+    for (const [key, value, ttl] of entries) {
+      this.set(key, value, ttl);
+    }
   }
 
   // 获取缓存统计信息
@@ -88,14 +161,29 @@ class CacheManager {
     hitRate: number;
     totalHits: number;
     totalMisses: number;
+    memoryUsage: number;
   } {
+    const totalRequests = this.totalHits + this.totalMisses;
+    const hitRate = totalRequests > 0 ? (this.totalHits / totalRequests) * 100 : 0;
+    
+    // 估算内存使用量（简化计算）
+    const memoryUsage = this.memoryCache.size * 1024; // 每个条目估算1KB
+    
     return {
       size: this.memoryCache.size,
       maxSize: this.maxMemorySize,
-      hitRate: 0, // 需要实现命中率统计
-      totalHits: 0,
-      totalMisses: 0
+      hitRate: Math.round(hitRate * 100) / 100,
+      totalHits: this.totalHits,
+      totalMisses: this.totalMisses,
+      memoryUsage
     };
+  }
+
+  // 定期清理任务
+  startPeriodicCleanup(interval: number = 60000): NodeJS.Timeout {
+    return setInterval(() => {
+      this.cleanup();
+    }, interval);
   }
 }
 
@@ -113,7 +201,7 @@ export function withCache<T>(
     const cache = CacheManager.getInstance();
 
     descriptor.value = async function (...args: any[]) {
-      const cacheKey = cache.generateKey(prefix, args);
+      const cacheKey = (cache as any).generateKey(prefix, args);
       
       // 尝试从缓存获取
       const cached = cache.get<T>(cacheKey);
@@ -252,7 +340,7 @@ export class LeaderboardCache {
   // 清除排行榜缓存
   static invalidateLeaderboardCache() {
     // 清除所有排行榜相关的缓存
-    for (const key of this.cache.memoryCache.keys()) {
+    for (const key of (this.cache as any).memoryCache.keys()) {
       if (key.startsWith('leaderboard:')) {
         this.cache.delete(key);
       }

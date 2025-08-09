@@ -1,5 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
+import { FlexBox, Button, Text, Card } from './ResponsiveLayout';
 
 interface GameHeaderProps {
   mineCount: number;
@@ -15,166 +16,170 @@ interface GameHeaderProps {
   onToggleFlagMode?: () => void;
 }
 
-const HeaderContainer = styled.div`
+const HeaderContainer = styled(Card)`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
-  background: #f0f0f0;
-  border: 2px inset #c0c0c0;
-  margin-bottom: 20px;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(245, 248, 255, 0.95) 100%);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(102, 126, 234, 0.1);
+  margin-bottom: 1rem;
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+  }
 `;
 
-const InfoPanel = styled.div`
-  display: flex;
-  gap: 20px;
+const InfoPanel = styled(FlexBox)`
+  gap: 1rem;
   align-items: center;
+  flex-wrap: wrap;
+  
+  @media (max-width: 768px) {
+    justify-content: center;
+    width: 100%;
+  }
 `;
 
 const InfoItem = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 10px;
-  background: #000;
-  color: #ff0000;
-  font-family: 'Courier New', monospace;
-  font-size: 18px;
-  font-weight: bold;
-  border: 2px inset #c0c0c0;
-  min-width: 60px;
-`;
-
-const InfoLabel = styled.div`
-  color: #fff;
-  font-size: 12px;
-  margin-bottom: 4px;
-`;
-
-const StatusPanel = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-`;
-
-const NewGameButton = styled.button`
-  padding: 10px 20px;
-  font-size: 16px;
-  background: #c0c0c0;
-  border: 2px outset #c0c0c0;
-  cursor: pointer;
-  
-  &:hover {
-    background: #d0d0d0;
-  }
-  
-  &:active {
-    border: 2px inset #c0c0c0;
-  }
-`;
-
-const ClaimButton = styled.button`
-  padding: 8px 16px;
-  font-size: 14px;
-  background: #4CAF50;
+  padding: 1rem 0.75rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  border: 2px outset #4CAF50;
-  cursor: pointer;
-  border-radius: 4px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+  font-size: 1.125rem;
+  font-weight: 700;
+  border-radius: 8px;
+  min-width: 80px;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
   
-  &:hover {
-    background: #45a049;
-  }
-  
-  &:active {
-    border: 2px inset #4CAF50;
-  }
-  
-  &:disabled {
-    background: #cccccc;
-    cursor: not-allowed;
+  @media (max-width: 768px) {
+    min-width: 70px;
+    padding: 0.75rem 0.5rem;
+    font-size: 1rem;
   }
 `;
 
-const LeaderboardButton = styled.button`
-  padding: 8px 16px;
-  font-size: 14px;
-  background: #2196F3;
-  color: white;
-  border: 2px outset #2196F3;
-  cursor: pointer;
-  border-radius: 4px;
-  margin-top: 5px;
+const InfoLabel = styled(Text)`
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
   
-  &:hover {
-    background: #1976D2;
+  @media (max-width: 768px) {
+    font-size: 0.7rem;
+  }
+`;
+
+const StatusPanel = styled(FlexBox)`
+  direction: column;
+  align: center;
+  gap: 0.75rem;
+  
+  @media (max-width: 768px) {
+    width: 100%;
+  }
+`;
+
+const NewGameButton = styled(Button)`
+  font-size: 1rem;
+  font-weight: 600;
+  
+  @media (max-width: 768px) {
+    width: 100%;
+  }
+`;
+
+const ClaimButton = styled(Button)`
+  background: linear-gradient(45deg, #4CAF50, #45a049) !important;
+  font-size: 0.875rem;
+  
+  &:hover:not(:disabled) {
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4) !important;
   }
   
-  &:active {
-    border: 2px inset #2196F3;
+  @media (max-width: 768px) {
+    width: 100%;
+  }
+`;
+
+const LeaderboardButton = styled(Button)`
+  background: linear-gradient(45deg, #2196F3, #1976D2) !important;
+  font-size: 0.875rem;
+  
+  &:hover:not(:disabled) {
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4) !important;
+  }
+  
+  @media (max-width: 768px) {
+    width: 100%;
   }
 `;
 
 const StatusEmoji = styled.div`
-  font-size: 32px;
+  font-size: 2rem;
+  
+  @media (max-width: 768px) {
+    font-size: 1.75rem;
+  }
 `;
 
-const ScoreDisplay = styled.div`
-  font-size: 16px;
-  color: #333;
-  margin-top: 5px;
-`;
-
-const MobileInstructions = styled.div`
-  font-size: 14px;
-  color: #333;
-  margin: 10px 0;
-  padding: 12px;
-  background: #e3f2fd;
-  border: 2px solid #2196F3;
-  border-radius: 8px;
+const ScoreDisplay = styled(Text)`
+  font-size: 0.875rem;
+  color: #666;
+  font-weight: 500;
   text-align: center;
-  line-height: 1.4;
-  display: none; /* 默认隐藏 */
+  
+  @media (max-width: 768px) {
+    font-size: 0.8rem;
+  }
+`;
+
+const MobileInstructions = styled(Card)`
+  font-size: 0.875rem;
+  color: #666;
+  padding: 1rem;
+  background: linear-gradient(135deg, rgba(33, 150, 243, 0.05) 0%, rgba(25, 118, 210, 0.1) 100%);
+  border: 1px solid rgba(33, 150, 243, 0.2);
+  text-align: center;
+  line-height: 1.5;
+  display: none;
+  margin-top: 1rem;
   
   strong {
     color: #1976D2;
-    font-size: 16px;
+    font-weight: 600;
   }
   
   @media (max-width: 768px) {
-    display: block; /* 手机端显示 */
+    display: block;
   }
 `;
 
-const FlagModeButton = styled.button<{$active: boolean}>`
-  padding: 12px 20px;
-  font-size: 16px;
-  font-weight: bold;
-  background: ${(props) => props.$active ? '#ff9800' : '#4CAF50'};
-  color: white;
-  border: 3px solid ${(props) => props.$active ? '#f57c00' : '#45a049'};
-  cursor: pointer;
-  border-radius: 8px;
-  margin: 8px 0;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-  transition: all 0.2s ease;
-  display: none; /* 默认隐藏 */
+const FlagModeButton = styled(Button)<{$active: boolean}>`
+  background: ${(props) => props.$active 
+    ? 'linear-gradient(45deg, #ff9800, #f57c00)' 
+    : 'linear-gradient(45deg, #4CAF50, #45a049)'} !important;
+  font-weight: 600;
+  margin-top: 0.5rem;
+  display: none;
   
   @media (max-width: 768px) {
-    display: block; /* 手机端显示 */
+    display: flex;
+    width: 100%;
   }
   
-  &:hover {
-    background: ${(props) => props.$active ? '#f57c00' : '#45a049'};
-    transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(0,0,0,0.3);
-  }
-  
-  &:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  &:hover:not(:disabled) {
+    box-shadow: ${(props) => props.$active 
+      ? '0 4px 12px rgba(255, 152, 0, 0.4)' 
+      : '0 4px 12px rgba(76, 175, 80, 0.4)'} !important;
   }
 `;
 
@@ -248,15 +253,17 @@ const GameHeader: React.FC<GameHeaderProps> = ({
           Status: {gameStatus.toUpperCase()}
         </ScoreDisplay>
         <MobileInstructions>
-          📱 <strong>手机操作:</strong><br/>
-          🚩 长按格子 = 插旗/取消旗子<br/>
-          💣 点击格子 = 挖雷
+          📱 <strong>手机操作说明:</strong><br/>
+          🚩 <strong>长按0.3秒</strong> = 插旗/取消旗子<br/>
+          💣 <strong>轻点</strong> = 挖开格子<br/>
+          ⚡ <strong>下方按钮</strong> = 切换操作模式<br/>
+          💡 <strong>提示</strong>：使用插旗模式更简单
         </MobileInstructions>
         <FlagModeButton 
           $active={flagMode}
           onClick={onToggleFlagMode || (() => {})}
         >
-          {flagMode ? '🚩 插旗模式' : '💣 挖雷模式'}
+          {flagMode ? '🚩 插旗模式 (点击插旗)' : '💣 挖雷模式 (长按插旗)'}
         </FlagModeButton>
       </StatusPanel>
     </HeaderContainer>

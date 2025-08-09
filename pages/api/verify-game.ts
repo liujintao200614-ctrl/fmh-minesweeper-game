@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { ethers } from 'ethers';
 import { rateLimit, rateLimiters } from '../../lib/rateLimit';
+import { AntiCheatSystem } from '../../lib/anti-cheat';
 
 // 游戏验证接口
 interface GameVerificationRequest {
@@ -219,6 +220,21 @@ export default async function handler(
       return res.status(400).json({ 
         isValid: false, 
         reason: 'Completion time too fast' 
+      });
+    }
+
+    // 反作弊系统验证
+    const antiCheatResult = await AntiCheatSystem.verifyGameIntegrity(
+      gameId, 
+      playerAddress, 
+      board, 
+      timeElapsed
+    );
+    
+    if (!antiCheatResult.isValid) {
+      return res.status(400).json({ 
+        isValid: false, 
+        reason: `Anti-cheat verification failed: ${antiCheatResult.reason}` 
       });
     }
 

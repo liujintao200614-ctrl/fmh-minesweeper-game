@@ -1,11 +1,57 @@
 import { useState, useCallback } from 'react';
 
-export function useGameHistory() {
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState(null);
+interface GameData {
+    walletAddress: string;
+    gameId: number;
+    gameWidth: number;
+    gameHeight: number;
+    mineCount: number;
+    isWon: boolean;
+    finalScore: number;
+    gameDuration: number;
+    cellsRevealed: number;
+    flagsUsed: number;
+    rewardAmount: number;
+    rewardClaimed: boolean;
+    startTxHash: string | null;
+    completeTxHash: string | null;
+    gameFee: number;
+}
+
+interface SaveResult {
+    success: boolean;
+    gameSessionId?: number;
+    error?: string;
+}
+
+interface Achievement {
+    id: number;
+    name: string;
+    description: string;
+    icon: string;
+}
+
+interface CompleteGameResult {
+    gameSaved: boolean;
+    gameSessionId: number | null;
+    achievements: Achievement[];
+    error: string | null;
+}
+
+interface UseGameHistoryReturn {
+    saving: boolean;
+    error: string | null;
+    saveGameRecord: (gameData: GameData) => Promise<SaveResult>;
+    checkAchievements: (userId: number, gameSessionId: number) => Promise<Achievement[]>;
+    completeGame: (gameData: GameData, userId?: number) => Promise<CompleteGameResult>;
+}
+
+export function useGameHistory(): UseGameHistoryReturn {
+    const [saving, setSaving] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
 
     // 保存游戏记录
-    const saveGameRecord = useCallback(async (gameData) => {
+    const saveGameRecord = useCallback(async (gameData: GameData): Promise<SaveResult> => {
         setSaving(true);
         setError(null);
 
@@ -29,7 +75,7 @@ export function useGameHistory() {
             } else {
                 throw new Error(result.error || 'Failed to save game record');
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('❌ Game save error:', error);
             setError(error.message);
             return {
@@ -42,7 +88,7 @@ export function useGameHistory() {
     }, []);
 
     // 检查并授予成就
-    const checkAchievements = useCallback(async (userId, gameSessionId) => {
+    const checkAchievements = useCallback(async (userId: number, gameSessionId: number): Promise<Achievement[]> => {
         try {
             const response = await fetch('/api/achievements/check', {
                 method: 'POST',
@@ -64,15 +110,15 @@ export function useGameHistory() {
                 console.warn('⚠️ Achievement check failed:', result.error);
                 return [];
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('❌ Achievement check error:', error);
             return [];
         }
     }, []);
 
     // 完整的游戏完成流程
-    const completeGame = useCallback(async (gameData, userId) => {
-        const results = {
+    const completeGame = useCallback(async (gameData: GameData, userId?: number): Promise<CompleteGameResult> => {
+        const results: CompleteGameResult = {
             gameSaved: false,
             gameSessionId: null,
             achievements: [],
@@ -83,23 +129,23 @@ export function useGameHistory() {
             // 1. 保存游戏记录
             const saveResult = await saveGameRecord(gameData);
             if (!saveResult.success) {
-                results.error = saveResult.error;
+                results.error = saveResult.error || 'Failed to save game';
                 return results;
             }
 
             results.gameSaved = true;
-            results.gameSessionId = saveResult.gameSessionId;
+            results.gameSessionId = saveResult.gameSessionId || null;
 
             // 2. 检查成就（只有胜利时才检查）
-            if (gameData.isWon && userId) {
-                const achievements = await checkAchievements(userId, saveResult.gameSessionId);
+            if (gameData.isWon && userId && results.gameSessionId) {
+                const achievements = await checkAchievements(userId, results.gameSessionId);
                 results.achievements = achievements;
             }
 
             console.log('🎮 Game completion process finished:', results);
             return results;
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('❌ Game completion error:', error);
             results.error = error.message;
             return results;

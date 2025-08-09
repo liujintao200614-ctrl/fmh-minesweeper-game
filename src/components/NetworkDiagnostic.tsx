@@ -126,7 +126,11 @@ export const NetworkDiagnostic: React.FC<{ onClose: () => void }> = ({ onClose }
 
       // 4. 测试RPC连接
       try {
-        const provider = new ethers.JsonRpcProvider('https://testnet-rpc.monad.xyz');
+        const provider = new ethers.JsonRpcProvider('https://testnet-rpc.monad.xyz', {
+          name: 'Monad Testnet',
+          chainId: 10143,
+          ensAddress: null // 禁用 ENS
+        });
         const blockNumber = await provider.getBlockNumber();
         result.rpcConnectivity = blockNumber > 0;
       } catch (error) {
@@ -136,7 +140,11 @@ export const NetworkDiagnostic: React.FC<{ onClose: () => void }> = ({ onClose }
       // 5. 获取余额（如果连接）
       if (result.connected && result.isCorrectNetwork) {
         try {
-          const provider = new ethers.BrowserProvider(ethereum);
+          const provider = new ethers.BrowserProvider(ethereum, {
+            name: 'Monad Testnet',
+            chainId: 10143,
+            ensAddress: null // 禁用 ENS
+          });
           const signer = await provider.getSigner();
           const address = await signer.getAddress();
           const balance = await provider.getBalance(address);
@@ -148,15 +156,19 @@ export const NetworkDiagnostic: React.FC<{ onClose: () => void }> = ({ onClose }
 
       // 6. 检查合约存在性
       try {
-        const provider = new ethers.JsonRpcProvider('https://testnet-rpc.monad.xyz');
+        const provider = new ethers.JsonRpcProvider('https://testnet-rpc.monad.xyz', {
+          name: 'Monad Testnet',
+          chainId: 10143,
+          ensAddress: null // 禁用 ENS
+        });
         
         const minesweeperCode = await provider.getCode(
-          process.env.NEXT_PUBLIC_MINESWEEPER_CONTRACT || '0x4bE377d2bf2b3412b6eBF1b179314fd90adf9C27'
+          import.meta.env.VITE_MINESWEEPER_CONTRACT || '0x4bE377d2bf2b3412b6eBF1b179314fd90adf9C27'
         );
         result.contractsExist.minesweeper = minesweeperCode !== '0x';
 
         const tokenCode = await provider.getCode(
-          process.env.NEXT_PUBLIC_FMH_TOKEN_CONTRACT || '0x83aB028468ef2a5495Cc7964B3266437956231E2'
+          import.meta.env.VITE_FMH_TOKEN_CONTRACT || '0x83aB028468ef2a5495Cc7964B3266437956231E2'
         );
         result.contractsExist.token = tokenCode !== '0x';
       } catch (error) {

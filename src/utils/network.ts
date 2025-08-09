@@ -24,7 +24,9 @@ export const MONAD_TESTNET_CONFIG: NetworkConfig = {
 };
 
 export class NetworkManager {
-  private static ethereum = typeof window !== 'undefined' ? (window as any).ethereum : null;
+  private static get ethereum() {
+    return typeof window !== 'undefined' ? (window as any).ethereum : null;
+  }
 
   // 添加Monad测试网到MetaMask
   static async addMonadTestnet(): Promise<boolean> {

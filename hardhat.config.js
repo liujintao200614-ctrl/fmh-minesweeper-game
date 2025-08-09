@@ -1,4 +1,5 @@
 require("@nomicfoundation/hardhat-ethers");
+require("@nomicfoundation/hardhat-verify");
 require("dotenv").config({ path: ".env.local" });
 
 /** @type import('hardhat/config').HardhatUserConfig */
@@ -38,5 +39,8 @@ module.exports = {
         },
       },
     ],
+  },
+  sourcify: {
+    enabled: true
   },
 };

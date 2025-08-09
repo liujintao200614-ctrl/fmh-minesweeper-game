@@ -51,15 +51,19 @@ class RateLimiter {
   }
 }
 
-// 不同API的速率限制器实例
-const verificationLimiter = new RateLimiter(60 * 1000, 10); // 每分钟10次
-const scoreLimiter = new RateLimiter(60 * 1000, 5); // 每分钟5次
-const leaderboardLimiter = new RateLimiter(60 * 1000, 20); // 每分钟20次
+// 不同API的速率限制器实例 - 更严格的限制
+const verificationLimiter = new RateLimiter(60 * 1000, 5); // 每分钟5次（降低）
+const scoreLimiter = new RateLimiter(60 * 1000, 3); // 每分钟3次（更严格）
+const claimLimiter = new RateLimiter(60 * 1000, 2); // 奖励申请每分钟2次
+const gameStartLimiter = new RateLimiter(60 * 1000, 8); // 开始游戏每分钟8次
+const leaderboardLimiter = new RateLimiter(60 * 1000, 15); // 每分钟15次（降低）
 
 // 定期清理
 setInterval(() => {
   verificationLimiter.cleanup();
   scoreLimiter.cleanup();
+  claimLimiter.cleanup();
+  gameStartLimiter.cleanup();
   leaderboardLimiter.cleanup();
 }, 5 * 60 * 1000); // 每5分钟清理一次
 
@@ -97,5 +101,7 @@ function getClientIP(req: NextApiRequest): string {
 export const rateLimiters = {
   verification: verificationLimiter,
   score: scoreLimiter,
+  claim: claimLimiter,
+  gameStart: gameStartLimiter,
   leaderboard: leaderboardLimiter
 };

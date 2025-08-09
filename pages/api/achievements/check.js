@@ -298,7 +298,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { getDatabase } = require('../../lib/database');
+        const { getDatabase } = require('../../../lib/database');
         const { userId, gameSessionId } = req.body;
 
         if (!userId || !gameSessionId) {

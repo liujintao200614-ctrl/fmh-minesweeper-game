@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>简单钱包测试</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 50px auto; 
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .section { 
+            background: white; 
+            padding: 20px; 
+            margin: 20px 0; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button { 
+            background: #4CAF50; 
+            color: white; 
+            border: none; 
+            padding: 15px 25px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 16px; 
+            margin: 10px 5px;
+        }
+        button:hover { background: #45a049; }
+        .result { 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+            font-family: monospace;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    </style>
+</head>
+<body>
+    <h1>🔧 简单钱包连接测试</h1>
+    
+    <div class="section">
+        <h3>步骤1: 检查基础环境</h3>
+        <button onclick="checkBasics()">检查环境</button>
+        <div id="basics-result"></div>
+    </div>
+
+    <div class="section">
+        <h3>步骤2: 连接钱包</h3>
+        <button onclick="connectWallet()">连接钱包</button>
+        <div id="wallet-result"></div>
+    </div>
+
+    <div class="section">
+        <h3>步骤3: 检查网络</h3>
+        <button onclick="checkNetwork()">检查网络</button>
+        <button onclick="switchNetwork()">切换到 Monad</button>
+        <div id="network-result"></div>
+    </div>
+
+    <div class="section">
+        <h3>实时状态</h3>
+        <div id="status-display">
+            <p><strong>钱包状态:</strong> <span id="wallet-status">未连接</span></p>
+            <p><strong>账户地址:</strong> <span id="account-display">无</span></p>
+            <p><strong>当前网络:</strong> <span id="network-display">未知</span></p>
+            <p><strong>Chain ID:</strong> <span id="chainid-display">未获取</span></p>
+        </div>
+    </div>
+
+    <script>
+        let currentAccount = null;
+        let currentChainId = null;
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="result ${type}">${message}</div>`;
+        }
+
+        function updateStatus() {
+            document.getElementById('wallet-status').textContent = currentAccount ? '已连接' : '未连接';
+            document.getElementById('account-display').textContent = currentAccount || '无';
+            document.getElementById('chainid-display').textContent = currentChainId || '未获取';
+            
+            if (currentChainId === 10143) {
+                document.getElementById('network-display').textContent = 'Monad 测试网 ✓';
+            } else if (currentChainId) {
+                document.getElementById('network-display').textContent = `Chain ID: ${currentChainId} (错误网络)`;
+            } else {
+                document.getElementById('network-display').textContent = '未知';
+            }
+        }
+
+        async function checkBasics() {
+            console.log('检查基础环境...');
+            
+            let results = [];
+            
+            // 检查 window 对象
+            if (typeof window !== 'undefined') {
+                results.push('✓ 运行在浏览器环境');
+            } else {
+                results.push('✗ 非浏览器环境');
+            }
+
+            // 检查 ethereum 对象
+            if (window.ethereum) {
+                results.push('✓ 检测到 Ethereum 对象');
+                console.log('Ethereum object:', window.ethereum);
+                
+                // 检查是否是 MetaMask
+                if (window.ethereum.isMetaMask) {
+                    results.push('✓ MetaMask 已安装');
+                } else {
+                    results.push('⚠ 检测到其他钱包 (非MetaMask)');
+                }
+            } else {
+                results.push('✗ 未检测到 Ethereum 对象 - 请安装 MetaMask');
+            }
+
+            // 检查网络连接
+            if (navigator.onLine) {
+                results.push('✓ 网络连接正常');
+            } else {
+                results.push('✗ 网络连接异常');
+            }
+
+            showResult('basics-result', results.join('<br>'), window.ethereum ? 'success' : 'error');
+        }
+
+        async function connectWallet() {
+            console.log('尝试连接钱包...');
+            
+            try {
+                if (!window.ethereum) {
+                    throw new Error('请先安装 MetaMask');
+                }
+
+                console.log('请求账户访问权限...');
+                
+                // 简单的账户请求
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_requestAccounts' 
+                });
+                
+                console.log('返回的账户:', accounts);
+
+                if (!accounts || accounts.length === 0) {
+                    throw new Error('没有返回账户，请检查 MetaMask 是否解锁');
+                }
+
+                currentAccount = accounts[0];
+                console.log('连接成功，账户:', currentAccount);
+                
+                // 获取链ID
+                const chainId = await window.ethereum.request({ 
+                    method: 'eth_chainId' 
+                });
+                currentChainId = parseInt(chainId, 16);
+                console.log('当前链ID:', currentChainId);
+
+                showResult('wallet-result', 
+                    `✓ 钱包连接成功!<br>账户: ${currentAccount}<br>Chain ID: ${currentChainId}`, 
+                    'success'
+                );
+                
+                updateStatus();
+
+            } catch (error) {
+                console.error('钱包连接失败:', error);
+                
+                let errorMsg = `✗ 连接失败: ${error.message}`;
+                
+                if (error.code === 4001) {
+                    errorMsg += '<br><br>💡 用户拒绝了连接请求';
+                } else if (error.code === -32002) {
+                    errorMsg += '<br><br>💡 MetaMask 中有待处理的请求，请打开 MetaMask 查看';
+                } else if (error.message.includes('User rejected')) {
+                    errorMsg += '<br><br>💡 请在 MetaMask 中点击"连接"按钮';
+                }
+                
+                showResult('wallet-result', errorMsg, 'error');
+            }
+        }
+
+        async function checkNetwork() {
+            if (!currentAccount) {
+                showResult('network-result', '请先连接钱包', 'error');
+                return;
+            }
+
+            try {
+                // 测试 RPC 连接
+                console.log('测试 Monad RPC 连接...');
+                
+                const response = await fetch('https://testnet-rpc.monad.xyz', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        method: 'eth_chainId',
+                        params: [],
+                        id: 1
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`RPC 请求失败: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const rpcChainId = parseInt(data.result, 16);
+                
+                let results = [];
+                results.push(`✓ RPC 连接成功`);
+                results.push(`✓ RPC Chain ID: ${rpcChainId}`);
+                results.push(`✓ 当前钱包 Chain ID: ${currentChainId}`);
+                
+                if (currentChainId === 10143) {
+                    results.push(`✓ 网络配置正确 (Monad 测试网)`);
+                    showResult('network-result', results.join('<br>'), 'success');
+                } else {
+                    results.push(`✗ 需要切换到 Monad 测试网 (Chain ID: 10143)`);
+                    showResult('network-result', results.join('<br>'), 'error');
+                }
+
+            } catch (error) {
+                console.error('网络检查失败:', error);
+                showResult('network-result', `✗ 网络检查失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function switchNetwork() {
+            if (!window.ethereum) {
+                showResult('network-result', '请先安装 MetaMask', 'error');
+                return;
+            }
+
+            try {
+                console.log('尝试切换到 Monad 测试网...');
+                
+                // 首先尝试切换
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0x2727' }] // 10143 的十六进制
+                });
+                
+                console.log('网络切换成功');
+                showResult('network-result', '✓ 成功切换到 Monad 测试网', 'success');
+                
+                // 更新状态
+                setTimeout(async () => {
+                    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                    currentChainId = parseInt(chainId, 16);
+                    updateStatus();
+                }, 1000);
+
+            } catch (switchError) {
+                console.log('切换失败，错误码:', switchError.code);
+                
+                if (switchError.code === 4902) {
+                    // 网络不存在，尝试添加
+                    console.log('网络不存在，尝试添加...');
+                    
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [{
+                                chainId: '0x2727',
+                                chainName: 'Monad Testnet',
+                                nativeCurrency: {
+                                    name: 'MON',
+                                    symbol: 'MON',
+                                    decimals: 18
+                                },
+                                rpcUrls: ['https://testnet-rpc.monad.xyz'],
+                                blockExplorerUrls: ['https://testnet-explorer.monad.xyz']
+                            }]
+                        });
+                        
+                        showResult('network-result', '✓ Monad 测试网已添加并切换', 'success');
+                        
+                        // 更新状态
+                        setTimeout(async () => {
+                            const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                            currentChainId = parseInt(chainId, 16);
+                            updateStatus();
+                        }, 1000);
+                        
+                    } catch (addError) {
+                        console.error('添加网络失败:', addError);
+                        showResult('network-result', `✗ 添加网络失败: ${addError.message}`, 'error');
+                    }
+                } else {
+                    console.error('切换网络失败:', switchError);
+                    showResult('network-result', `✗ 切换网络失败: ${switchError.message}`, 'error');
+                }
+            }
+        }
+
+        // 监听钱包事件
+        if (window.ethereum) {
+            window.ethereum.on('accountsChanged', function(accounts) {
+                console.log('账户变更:', accounts);
+                currentAccount = accounts[0] || null;
+                updateStatus();
+            });
+
+            window.ethereum.on('chainChanged', function(chainId) {
+                console.log('网络变更:', chainId);
+                currentChainId = parseInt(chainId, 16);
+                updateStatus();
+            });
+        }
+
+        // 页面加载时自动检查基础环境
+        window.addEventListener('load', function() {
+            console.log('页面加载完成');
+            checkBasics();
+        });
+    </script>
+</body>
+</html>

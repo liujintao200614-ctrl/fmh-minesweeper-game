@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>钱包连接调试工具</title>
+    <style>
+        body { 
+            font-family: monospace; 
+            padding: 20px; 
+            background: #f0f0f0; 
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+        }
+        .status { 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 4px; 
+        }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        #log {
+            background: #000;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 4px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 钱包连接诊断工具</h1>
+        
+        <div class="status info">
+            <h3>环境检测</h3>
+            <p>浏览器: <span id="browser"></span></p>
+            <p>MetaMask: <span id="metamask-status"></span></p>
+            <p>当前网络: <span id="current-network"></span></p>
+        </div>
+
+        <div class="controls">
+            <button id="detect-btn">🔍 检测钱包</button>
+            <button id="connect-btn" disabled>🔗 连接钱包</button>
+            <button id="switch-network-btn" disabled>🔄 切换到Monad测试网</button>
+            <button id="clear-log-btn">🗑️ 清空日志</button>
+        </div>
+
+        <div class="status" id="connection-status">
+            <h3>连接状态</h3>
+            <p>账户: <span id="account">未连接</span></p>
+            <p>网络ID: <span id="chain-id">未知</span></p>
+            <p>余额: <span id="balance">-</span></p>
+        </div>
+
+        <h3>实时日志</h3>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        const log = document.getElementById('log');
+        const browserSpan = document.getElementById('browser');
+        const metamaskStatus = document.getElementById('metamask-status');
+        const currentNetwork = document.getElementById('current-network');
+        const accountSpan = document.getElementById('account');
+        const chainIdSpan = document.getElementById('chain-id');
+        const balanceSpan = document.getElementById('balance');
+        const connectionStatus = document.getElementById('connection-status');
+
+        const detectBtn = document.getElementById('detect-btn');
+        const connectBtn = document.getElementById('connect-btn');
+        const switchNetworkBtn = document.getElementById('switch-network-btn');
+        const clearLogBtn = document.getElementById('clear-log-btn');
+
+        let ethereum = null;
+
+        function logMessage(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const emoji = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+            log.textContent += `[${timestamp}] ${emoji} ${message}\n`;
+            log.scrollTop = log.scrollHeight;
+            console.log(`[WALLET DEBUG] ${message}`);
+        }
+
+        function updateStatus(type) {
+            connectionStatus.className = `status ${type}`;
+        }
+
+        // 检测浏览器
+        function detectBrowser() {
+            const userAgent = navigator.userAgent;
+            if (userAgent.includes('Chrome')) return 'Chrome';
+            if (userAgent.includes('Firefox')) return 'Firefox';
+            if (userAgent.includes('Safari')) return 'Safari';
+            if (userAgent.includes('Edge')) return 'Edge';
+            return 'Unknown';
+        }
+
+        // 检测钱包
+        async function detectWallet() {
+            logMessage('开始钱包检测...');
+            
+            browserSpan.textContent = detectBrowser();
+            
+            if (typeof window === 'undefined') {
+                logMessage('错误: 不在浏览器环境中', 'error');
+                return false;
+            }
+
+            ethereum = window.ethereum;
+            logMessage(`Window.ethereum 存在: ${!!ethereum}`);
+            
+            if (!ethereum) {
+                metamaskStatus.textContent = '❌ 未安装';
+                metamaskStatus.style.color = 'red';
+                logMessage('MetaMask未检测到，请安装MetaMask扩展', 'error');
+                return false;
+            }
+
+            metamaskStatus.textContent = '✅ 已安装';
+            metamaskStatus.style.color = 'green';
+            
+            logMessage(`MetaMask版本: ${ethereum.version || '未知'}`);
+            logMessage(`是否为MetaMask: ${ethereum.isMetaMask}`);
+            logMessage(`提供商: ${ethereum.constructor.name}`);
+
+            // 检测当前网络
+            try {
+                const chainId = await ethereum.request({ method: 'eth_chainId' });
+                const networkId = parseInt(chainId, 16);
+                currentNetwork.textContent = `${networkId} (0x${networkId.toString(16)})`;
+                logMessage(`当前网络ID: ${networkId}`);
+            } catch (error) {
+                logMessage(`获取网络ID失败: ${error.message}`, 'error');
+            }
+
+            // 检查是否已连接
+            try {
+                const accounts = await ethereum.request({ method: 'eth_accounts' });
+                if (accounts.length > 0) {
+                    accountSpan.textContent = `${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`;
+                    chainIdSpan.textContent = await ethereum.request({ method: 'eth_chainId' });
+                    updateStatus('success');
+                    logMessage('钱包已连接', 'success');
+                    connectBtn.textContent = '🔓 断开连接';
+                    switchNetworkBtn.disabled = false;
+                } else {
+                    updateStatus('info');
+                    connectBtn.disabled = false;
+                }
+            } catch (error) {
+                logMessage(`检查连接状态失败: ${error.message}`, 'error');
+                updateStatus('error');
+            }
+
+            return true;
+        }
+
+        // 连接钱包
+        async function connectWallet() {
+            if (!ethereum) {
+                logMessage('MetaMask未检测到', 'error');
+                return;
+            }
+
+            logMessage('开始连接钱包...');
+            
+            try {
+                // 尝试连接
+                const accounts = await ethereum.request({ 
+                    method: 'eth_requestAccounts' 
+                });
+                
+                logMessage(`成功获取账户: ${accounts.length}个`, 'success');
+                accounts.forEach((account, index) => {
+                    logMessage(`账户${index + 1}: ${account}`);
+                });
+
+                if (accounts.length > 0) {
+                    accountSpan.textContent = `${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`;
+                    
+                    const chainId = await ethereum.request({ method: 'eth_chainId' });
+                    chainIdSpan.textContent = chainId;
+                    
+                    try {
+                        const balance = await ethereum.request({
+                            method: 'eth_getBalance',
+                            params: [accounts[0], 'latest']
+                        });
+                        const balanceInEth = parseInt(balance, 16) / Math.pow(10, 18);
+                        balanceSpan.textContent = `${balanceInEth.toFixed(4)} ETH`;
+                    } catch (balError) {
+                        logMessage(`获取余额失败: ${balError.message}`, 'error');
+                    }
+
+                    updateStatus('success');
+                    connectBtn.textContent = '🔓 断开连接';
+                    switchNetworkBtn.disabled = false;
+                    logMessage('钱包连接成功！', 'success');
+                }
+            } catch (error) {
+                logMessage(`连接失败: ${error.message}`, 'error');
+                logMessage(`错误代码: ${error.code}`);
+                updateStatus('error');
+                
+                // 详细错误分析
+                if (error.code === 4001) {
+                    logMessage('用户拒绝了连接请求', 'error');
+                } else if (error.code === -32002) {
+                    logMessage('连接请求已在处理中，请检查MetaMask弹窗', 'error');
+                } else if (error.code === -32603) {
+                    logMessage('内部错误，请刷新页面重试', 'error');
+                }
+            }
+        }
+
+        // 切换网络
+        async function switchToMonadTestnet() {
+            if (!ethereum) return;
+            
+            const MONAD_CHAIN_ID = '0x279F'; // 10143 in hex
+            
+            logMessage('尝试切换到Monad测试网...');
+            
+            try {
+                await ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: MONAD_CHAIN_ID }],
+                });
+                logMessage('成功切换到Monad测试网', 'success');
+            } catch (switchError) {
+                if (switchError.code === 4902) {
+                    logMessage('网络未添加，尝试添加Monad测试网...');
+                    try {
+                        await ethereum.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [{
+                                chainId: MONAD_CHAIN_ID,
+                                chainName: 'Monad Testnet',
+                                nativeCurrency: {
+                                    name: 'MON',
+                                    symbol: 'MON',
+                                    decimals: 18,
+                                },
+                                rpcUrls: ['https://testnet-rpc.monad.xyz'],
+                                blockExplorerUrls: ['https://testnet-explorer.monad.xyz'],
+                            }],
+                        });
+                        logMessage('成功添加并切换到Monad测试网', 'success');
+                    } catch (addError) {
+                        logMessage(`添加网络失败: ${addError.message}`, 'error');
+                    }
+                } else {
+                    logMessage(`切换网络失败: ${switchError.message}`, 'error');
+                }
+            }
+        }
+
+        // 断开连接
+        function disconnectWallet() {
+            accountSpan.textContent = '未连接';
+            chainIdSpan.textContent = '未知';
+            balanceSpan.textContent = '-';
+            updateStatus('info');
+            connectBtn.textContent = '🔗 连接钱包';
+            switchNetworkBtn.disabled = true;
+            logMessage('钱包已断开', 'info');
+        }
+
+        // 事件监听器
+        detectBtn.addEventListener('click', detectWallet);
+        
+        connectBtn.addEventListener('click', () => {
+            if (connectBtn.textContent.includes('断开')) {
+                disconnectWallet();
+            } else {
+                connectWallet();
+            }
+        });
+        
+        switchNetworkBtn.addEventListener('click', switchToMonadTestnet);
+        
+        clearLogBtn.addEventListener('click', () => {
+            log.textContent = '';
+            logMessage('日志已清空');
+        });
+
+        // 页面加载时自动检测
+        window.addEventListener('load', () => {
+            logMessage('页面加载完成，开始初始化...');
+            detectWallet();
+        });
+
+        // MetaMask事件监听
+        if (window.ethereum) {
+            window.ethereum.on('accountsChanged', (accounts) => {
+                logMessage(`账户变更: ${accounts.length > 0 ? accounts[0] : '无账户'}`);
+                if (accounts.length === 0) {
+                    disconnectWallet();
+                } else {
+                    accountSpan.textContent = `${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`;
+                }
+            });
+
+            window.ethereum.on('chainChanged', (chainId) => {
+                logMessage(`网络变更: ${parseInt(chainId, 16)}`);
+                chainIdSpan.textContent = chainId;
+                window.location.reload(); // 推荐重新加载页面
+            });
+        }
+
+        logMessage('钱包调试工具初始化完成');
+    </script>
+</body>
+</html>

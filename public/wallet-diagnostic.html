@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>钱包连接诊断工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .error {
+            color: #d32f2f;
+            background: #ffebee;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #388e3c;
+            background: #e8f5e8;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .info {
+            color: #1976d2;
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .code {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            margin: 10px 0;
+            border-left: 4px solid #2196F3;
+        }
+        .status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .status:last-child {
+            border-bottom: none;
+        }
+        .indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .green { background: #4CAF50; }
+        .red { background: #f44336; }
+        .yellow { background: #ff9800; }
+    </style>
+</head>
+<body>
+    <h1>🔧 钱包连接诊断工具</h1>
+    
+    <div class="section">
+        <h2>📋 环境检测</h2>
+        <div id="environment-status">
+            <div class="status">
+                <span><span class="indicator" id="browser-indicator"></span>浏览器环境</span>
+                <span id="browser-status">检测中...</span>
+            </div>
+            <div class="status">
+                <span><span class="indicator" id="ethereum-indicator"></span>Ethereum 对象</span>
+                <span id="ethereum-status">检测中...</span>
+            </div>
+            <div class="status">
+                <span><span class="indicator" id="metamask-indicator"></span>MetaMask</span>
+                <span id="metamask-status">检测中...</span>
+            </div>
+            <div class="status">
+                <span><span class="indicator" id="network-indicator"></span>网络连接</span>
+                <span id="network-status">检测中...</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>🔗 钱包连接测试</h2>
+        <button id="connect-btn" onclick="testWalletConnection()">连接钱包</button>
+        <button id="switch-network-btn" onclick="switchToMonadTestnet()" disabled>切换到 Monad 测试网</button>
+        <button id="get-balance-btn" onclick="getBalance()" disabled>获取余额</button>
+        <div id="connection-result"></div>
+    </div>
+
+    <div class="section">
+        <h2>🌐 网络信息</h2>
+        <div id="network-info">
+            <div class="status">
+                <span>当前链ID</span>
+                <span id="current-chain">未连接</span>
+            </div>
+            <div class="status">
+                <span>目标链ID (Monad 测试网)</span>
+                <span>41454</span>
+            </div>
+            <div class="status">
+                <span>账户地址</span>
+                <span id="account-address">未连接</span>
+            </div>
+            <div class="status">
+                <span>账户余额</span>
+                <span id="account-balance">未获取</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>📝 诊断日志</h2>
+        <div id="diagnostic-log" class="code"></div>
+        <button onclick="clearLog()">清除日志</button>
+        <button onclick="downloadLog()">下载日志</button>
+    </div>
+
+    <script>
+        let diagnosticLog = [];
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            diagnosticLog.push(logEntry);
+            
+            const logDiv = document.getElementById('diagnostic-log');
+            const div = document.createElement('div');
+            div.textContent = logEntry;
+            if (type === 'error') div.style.color = '#d32f2f';
+            if (type === 'success') div.style.color = '#388e3c';
+            logDiv.appendChild(div);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            diagnosticLog = [];
+            document.getElementById('diagnostic-log').innerHTML = '';
+        }
+
+        function downloadLog() {
+            const logContent = diagnosticLog.join('\n');
+            const blob = new Blob([logContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `wallet-diagnostic-${new Date().toISOString().slice(0,19)}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function updateStatus(elementId, status, isGood) {
+            const indicator = document.getElementById(elementId + '-indicator');
+            const statusElement = document.getElementById(elementId + '-status');
+            
+            if (isGood) {
+                indicator.className = 'indicator green';
+                statusElement.textContent = status;
+                statusElement.style.color = '#388e3c';
+            } else {
+                indicator.className = 'indicator red';
+                statusElement.textContent = status;
+                statusElement.style.color = '#d32f2f';
+            }
+        }
+
+        function checkEnvironment() {
+            log('开始环境检测...');
+            
+            // 检查浏览器环境
+            if (typeof window !== 'undefined') {
+                updateStatus('browser', '✓ 浏览器环境正常', true);
+                log('✓ 浏览器环境检测通过', 'success');
+            } else {
+                updateStatus('browser', '✗ 非浏览器环境', false);
+                log('✗ 非浏览器环境', 'error');
+            }
+
+            // 检查 Ethereum 对象
+            if (window.ethereum) {
+                updateStatus('ethereum', '✓ Ethereum 对象存在', true);
+                log('✓ Ethereum 对象检测通过', 'success');
+                log(`Ethereum 提供者: ${window.ethereum.constructor.name}`);
+            } else {
+                updateStatus('ethereum', '✗ 未找到 Ethereum 对象', false);
+                log('✗ 未找到 Ethereum 对象', 'error');
+            }
+
+            // 检查 MetaMask
+            if (window.ethereum && window.ethereum.isMetaMask) {
+                updateStatus('metamask', '✓ MetaMask 已安装', true);
+                log('✓ MetaMask 检测通过', 'success');
+                log(`MetaMask 版本: ${window.ethereum.version || '未知'}`);
+            } else if (window.ethereum) {
+                updateStatus('metamask', '⚠ 其他钱包', false);
+                log('⚠ 检测到其他钱包，非 MetaMask', 'error');
+            } else {
+                updateStatus('metamask', '✗ 未安装 MetaMask', false);
+                log('✗ 未检测到 MetaMask', 'error');
+            }
+
+            // 检查网络连接
+            if (navigator.onLine) {
+                updateStatus('network', '✓ 网络连接正常', true);
+                log('✓ 网络连接正常', 'success');
+            } else {
+                updateStatus('network', '✗ 网络连接异常', false);
+                log('✗ 网络连接异常', 'error');
+            }
+        }
+
+        async function testWalletConnection() {
+            log('开始钱包连接测试...');
+            const resultDiv = document.getElementById('connection-result');
+            const connectBtn = document.getElementById('connect-btn');
+            
+            connectBtn.disabled = true;
+            connectBtn.textContent = '连接中...';
+            
+            try {
+                if (!window.ethereum) {
+                    throw new Error('未检测到钱包扩展');
+                }
+
+                log('请求钱包权限...');
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_requestAccounts' 
+                });
+                
+                if (accounts.length === 0) {
+                    throw new Error('用户拒绝连接钱包');
+                }
+
+                const account = accounts[0];
+                log(`✓ 钱包连接成功: ${account}`, 'success');
+                document.getElementById('account-address').textContent = 
+                    `${account.slice(0, 6)}...${account.slice(-4)}`;
+
+                // 获取链ID
+                const chainId = await window.ethereum.request({ 
+                    method: 'eth_chainId' 
+                });
+                const chainIdDecimal = parseInt(chainId, 16);
+                log(`当前链ID: ${chainIdDecimal} (0x${chainIdDecimal.toString(16)})`);
+                document.getElementById('current-chain').textContent = chainIdDecimal;
+
+                // 检查是否为 Monad 测试网
+                if (chainIdDecimal === 41454) {
+                    log('✓ 已连接到 Monad 测试网', 'success');
+                    resultDiv.innerHTML = '<div class="success">✓ 钱包连接成功，已在 Monad 测试网</div>';
+                } else {
+                    log('⚠ 当前不在 Monad 测试网', 'error');
+                    resultDiv.innerHTML = '<div class="error">⚠ 钱包已连接，但需要切换到 Monad 测试网</div>';
+                    document.getElementById('switch-network-btn').disabled = false;
+                }
+
+                document.getElementById('get-balance-btn').disabled = false;
+
+            } catch (error) {
+                log(`✗ 钱包连接失败: ${error.message}`, 'error');
+                resultDiv.innerHTML = `<div class="error">连接失败: ${error.message}</div>`;
+            } finally {
+                connectBtn.disabled = false;
+                connectBtn.textContent = '连接钱包';
+            }
+        }
+
+        async function switchToMonadTestnet() {
+            log('尝试切换到 Monad 测试网...');
+            
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0xa1f6' }], // 41454 in hex
+                });
+                log('✓ 成功切换到 Monad 测试网', 'success');
+                document.getElementById('current-chain').textContent = '41454';
+            } catch (switchError) {
+                if (switchError.code === 4902) {
+                    log('网络未添加，尝试添加 Monad 测试网...');
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [{
+                                chainId: '0xa1f6',
+                                chainName: 'Monad Testnet',
+                                nativeCurrency: {
+                                    name: 'MON',
+                                    symbol: 'MON',
+                                    decimals: 18
+                                },
+                                rpcUrls: ['https://testnet-rpc.monad.xyz'],
+                                blockExplorerUrls: ['https://testnet-explorer.monad.xyz']
+                            }]
+                        });
+                        log('✓ 成功添加并切换到 Monad 测试网', 'success');
+                        document.getElementById('current-chain').textContent = '41454';
+                    } catch (addError) {
+                        log(`✗ 添加网络失败: ${addError.message}`, 'error');
+                    }
+                } else {
+                    log(`✗ 切换网络失败: ${switchError.message}`, 'error');
+                }
+            }
+        }
+
+        async function getBalance() {
+            log('获取账户余额...');
+            
+            try {
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_accounts' 
+                });
+                
+                if (accounts.length === 0) {
+                    throw new Error('未连接钱包');
+                }
+
+                const balance = await window.ethereum.request({
+                    method: 'eth_getBalance',
+                    params: [accounts[0], 'latest']
+                });
+
+                const balanceInEth = parseInt(balance, 16) / Math.pow(10, 18);
+                log(`账户余额: ${balanceInEth} MON`);
+                document.getElementById('account-balance').textContent = 
+                    `${balanceInEth.toFixed(4)} MON`;
+
+            } catch (error) {
+                log(`✗ 获取余额失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时执行环境检测
+        window.addEventListener('load', () => {
+            log('页面加载完成，开始诊断...');
+            checkEnvironment();
+        });
+
+        // 监听钱包事件
+        if (window.ethereum) {
+            window.ethereum.on('accountsChanged', (accounts) => {
+                log(`账户变更: ${accounts[0] || '无账户'}`);
+                if (accounts.length > 0) {
+                    document.getElementById('account-address').textContent = 
+                        `${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`;
+                } else {
+                    document.getElementById('account-address').textContent = '未连接';
+                }
+            });
+
+            window.ethereum.on('chainChanged', (chainId) => {
+                const chainIdDecimal = parseInt(chainId, 16);
+                log(`网络变更: ${chainIdDecimal}`);
+                document.getElementById('current-chain').textContent = chainIdDecimal;
+            });
+        }
+    </script>
+</body>
+</html>

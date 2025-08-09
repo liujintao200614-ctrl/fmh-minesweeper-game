@@ -9,6 +9,7 @@ export const createEmptyBoard = (width: number, height: number): Cell[][] => {
       neighborMines: 0,
       row,
       col,
+      isTriggered: false,
     }))
   );
 };
@@ -194,4 +195,24 @@ export const getGameDifficulty = (config: GameConfig): string => {
   if (ratio < 0.15) return 'Easy';
   if (ratio < 0.25) return 'Medium';
   return 'Hard';
+};
+
+// 游戏结束时显示所有地雷
+export const revealAllMines = (board: Cell[][]): Cell[][] => {
+  return board.map(row => 
+    row.map(cell => ({
+      ...cell,
+      isRevealed: cell.isMine ? true : cell.isRevealed
+    }))
+  );
+};
+
+// 标记触发的地雷（踩雷时用于高亮）
+export const markTriggeredMine = (board: Cell[][], row: number, col: number): Cell[][] => {
+  return board.map((boardRow, r) => 
+    boardRow.map((cell, c) => ({
+      ...cell,
+      isTriggered: cell.isMine && r === row && c === col
+    }))
+  );
 };

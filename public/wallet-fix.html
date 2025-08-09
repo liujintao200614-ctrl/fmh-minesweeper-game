@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>钱包连接修复工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f0f8ff;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-left: 4px solid #2196F3;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+        .error { color: #d32f2f; background: #ffebee; padding: 10px; border-radius: 5px; }
+        .success { color: #388e3c; background: #e8f5e8; padding: 10px; border-radius: 5px; }
+        .warning { color: #f57c00; background: #fff3e0; padding: 10px; border-radius: 5px; }
+        .info { color: #1976d2; background: #e3f2fd; padding: 10px; border-radius: 5px; }
+        h1 { color: #1976d2; text-align: center; }
+        h2 { color: #333; margin-top: 0; }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .connected { background: #4CAF50; color: white; }
+        .disconnected { background: #f44336; color: white; }
+        .wrong-network { background: #ff9800; color: white; }
+    </style>
+</head>
+<body>
+    <h1>🔧 钱包连接修复工具</h1>
+    
+    <div class="card">
+        <h2>🔍 当前状态检查</h2>
+        <p>钱包状态: <span id="wallet-status">检测中...</span></p>
+        <p>网络状态: <span id="network-status">检测中...</span></p>
+        <p>账户地址: <span id="account-display">未连接</span></p>
+        <button onclick="checkStatus()">重新检测</button>
+    </div>
+
+    <div class="card">
+        <h2>🚀 快速修复</h2>
+        <div class="info">
+            <strong>常见问题自动修复：</strong>
+        </div>
+        <button onclick="quickConnect()">一键连接钱包</button>
+        <button onclick="switchNetwork()">切换到 Monad 测试网</button>
+        <button onclick="resetConnection()">重置连接</button>
+        <div id="fix-result"></div>
+    </div>
+
+    <div class="card">
+        <h2>📋 详细诊断</h2>
+        <div id="diagnostic-details"></div>
+        <button onclick="runFullDiagnostic()">完整诊断</button>
+    </div>
+
+    <div class="card">
+        <h2>🛠 手动解决方案</h2>
+        <div class="warning">
+            <strong>如果自动修复失败，请尝试以下步骤：</strong>
+            <ol>
+                <li>确保已安装 MetaMask 浏览器扩展</li>
+                <li>刷新页面并重新连接</li>
+                <li>在 MetaMask 中手动添加 Monad 测试网</li>
+                <li>检查 MetaMask 是否被其他应用锁定</li>
+                <li>清除浏览器缓存并重试</li>
+            </ol>
+        </div>
+        <button onclick="openMetaMask()">打开 MetaMask</button>
+        <button onclick="copyNetworkConfig()">复制网络配置</button>
+    </div>
+
+    <script>
+        const MONAD_TESTNET = {
+            chainId: '0xa1f6', // 41454
+            chainName: 'Monad Testnet',
+            nativeCurrency: {
+                name: 'MON',
+                symbol: 'MON',
+                decimals: 18
+            },
+            rpcUrls: ['https://testnet-rpc.monad.xyz'],
+            blockExplorerUrls: ['https://testnet-explorer.monad.xyz']
+        };
+
+        let currentAccount = null;
+        let currentChainId = null;
+
+        function updateStatus(walletMsg, networkMsg, account = null) {
+            document.getElementById('wallet-status').innerHTML = walletMsg;
+            document.getElementById('network-status').innerHTML = networkMsg;
+            if (account) {
+                document.getElementById('account-display').textContent = 
+                    `${account.slice(0, 6)}...${account.slice(-4)}`;
+            }
+        }
+
+        function showResult(message, type = 'info') {
+            const resultDiv = document.getElementById('fix-result');
+            resultDiv.innerHTML = `<div class="${type}" style="margin-top: 15px;">${message}</div>`;
+        }
+
+        async function checkStatus() {
+            console.log('开始状态检查...');
+            
+            if (!window.ethereum) {
+                updateStatus(
+                    '❌ 未检测到钱包 <span class="status-badge disconnected">未安装</span>',
+                    '⚠️ 无法检测网络'
+                );
+                return;
+            }
+
+            try {
+                // 检查连接状态
+                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                
+                currentAccount = accounts[0] || null;
+                currentChainId = parseInt(chainId, 16);
+
+                if (currentAccount) {
+                    updateStatus(
+                        '✅ 钱包已连接 <span class="status-badge connected">已连接</span>',
+                        currentChainId === 41454 
+                            ? '✅ Monad 测试网 <span class="status-badge connected">正确网络</span>'
+                            : `⚠️ 错误网络 (${currentChainId}) <span class="status-badge wrong-network">需切换</span>`,
+                        currentAccount
+                    );
+                } else {
+                    updateStatus(
+                        '⚠️ 钱包未连接 <span class="status-badge disconnected">未连接</span>',
+                        '⚠️ 需要先连接钱包'
+                    );
+                }
+            } catch (error) {
+                updateStatus(
+                    '❌ 钱包检测失败 <span class="status-badge disconnected">错误</span>',
+                    `❌ 错误: ${error.message}`
+                );
+            }
+        }
+
+        async function quickConnect() {
+            console.log('开始快速连接...');
+            showResult('正在连接钱包...', 'info');
+
+            try {
+                if (!window.ethereum) {
+                    throw new Error('未检测到 MetaMask，请先安装');
+                }
+
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_requestAccounts' 
+                });
+
+                if (accounts.length === 0) {
+                    throw new Error('用户拒绝连接');
+                }
+
+                currentAccount = accounts[0];
+                showResult(`✅ 钱包连接成功！地址: ${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`, 'success');
+                
+                // 自动检查网络
+                await checkStatus();
+                
+                // 如果不在正确网络，提示切换
+                if (currentChainId !== 41454) {
+                    showResult('⚠️ 钱包已连接，但需要切换到 Monad 测试网', 'warning');
+                }
+
+            } catch (error) {
+                showResult(`❌ 连接失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function switchNetwork() {
+            console.log('开始切换网络...');
+            showResult('正在切换到 Monad 测试网...', 'info');
+
+            try {
+                if (!window.ethereum) {
+                    throw new Error('未检测到钱包');
+                }
+
+                // 尝试切换到 Monad 测试网
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: MONAD_TESTNET.chainId }]
+                });
+
+                showResult('✅ 成功切换到 Monad 测试网！', 'success');
+                await checkStatus();
+
+            } catch (switchError) {
+                console.log('切换失败，尝试添加网络...', switchError);
+                
+                if (switchError.code === 4902) {
+                    try {
+                        // 网络不存在，尝试添加
+                        await window.ethereum.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [MONAD_TESTNET]
+                        });
+                        showResult('✅ 成功添加并切换到 Monad 测试网！', 'success');
+                        await checkStatus();
+                    } catch (addError) {
+                        showResult(`❌ 添加网络失败: ${addError.message}`, 'error');
+                    }
+                } else {
+                    showResult(`❌ 切换网络失败: ${switchError.message}`, 'error');
+                }
+            }
+        }
+
+        async function resetConnection() {
+            console.log('重置连接...');
+            showResult('正在重置连接...', 'info');
+
+            try {
+                // 清除当前状态
+                currentAccount = null;
+                currentChainId = null;
+                
+                // 重新检查状态
+                await checkStatus();
+                
+                showResult('✅ 连接已重置，请重新连接钱包', 'success');
+            } catch (error) {
+                showResult(`❌ 重置失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function runFullDiagnostic() {
+            const detailsDiv = document.getElementById('diagnostic-details');
+            let diagnostic = '<h3>📊 诊断报告</h3>';
+
+            // 基础环境检查
+            diagnostic += '<h4>🔧 环境检查</h4>';
+            diagnostic += `<p>• 浏览器: ${navigator.userAgent}</p>`;
+            diagnostic += `<p>• Ethereum 对象: ${!!window.ethereum ? '✅ 存在' : '❌ 不存在'}</p>`;
+            diagnostic += `<p>• MetaMask: ${window.ethereum?.isMetaMask ? '✅ 已安装' : '❌ 未安装'}</p>`;
+            diagnostic += `<p>• 网络状态: ${navigator.onLine ? '✅ 在线' : '❌ 离线'}</p>`;
+
+            if (window.ethereum) {
+                try {
+                    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                    
+                    diagnostic += '<h4>🔗 连接状态</h4>';
+                    diagnostic += `<p>• 连接账户数: ${accounts.length}</p>`;
+                    diagnostic += `<p>• 当前账户: ${accounts[0] || '无'}</p>`;
+                    diagnostic += `<p>• 当前链ID: ${parseInt(chainId, 16)} (0x${parseInt(chainId, 16).toString(16)})</p>`;
+                    diagnostic += `<p>• 目标链ID: 41454 (0xa1f6)</p>`;
+                    diagnostic += `<p>• 网络匹配: ${parseInt(chainId, 16) === 41454 ? '✅ 正确' : '❌ 需要切换'}</p>`;
+                } catch (error) {
+                    diagnostic += `<p class="error">获取钱包信息失败: ${error.message}</p>`;
+                }
+            }
+
+            detailsDiv.innerHTML = diagnostic;
+        }
+
+        function openMetaMask() {
+            if (window.ethereum) {
+                window.ethereum.request({ method: 'wallet_requestPermissions', params: [{ eth_accounts: {} }] });
+            } else {
+                window.open('https://metamask.io/download.html', '_blank');
+            }
+        }
+
+        function copyNetworkConfig() {
+            const config = `
+网络名称: ${MONAD_TESTNET.chainName}
+链ID: 41454
+RPC URL: ${MONAD_TESTNET.rpcUrls[0]}
+货币符号: ${MONAD_TESTNET.nativeCurrency.symbol}
+区块浏览器: ${MONAD_TESTNET.blockExplorerUrls[0]}
+            `.trim();
+            
+            navigator.clipboard.writeText(config).then(() => {
+                showResult('✅ 网络配置已复制到剪贴板', 'success');
+            }).catch(() => {
+                showResult('❌ 复制失败，请手动复制配置信息', 'error');
+            });
+        }
+
+        // 页面加载时自动检查状态
+        window.addEventListener('load', checkStatus);
+
+        // 监听钱包事件
+        if (window.ethereum) {
+            window.ethereum.on('accountsChanged', (accounts) => {
+                console.log('账户变更:', accounts);
+                currentAccount = accounts[0] || null;
+                checkStatus();
+            });
+
+            window.ethereum.on('chainChanged', (chainId) => {
+                console.log('网络变更:', chainId);
+                currentChainId = parseInt(chainId, 16);
+                checkStatus();
+            });
+        }
+    </script>
+</body>
+</html>

@@ -7,102 +7,74 @@ interface Props {
 
 interface State {
   hasError: boolean;
-  error: Error | null;
+  error?: Error;
 }
 
 const ErrorContainer = styled.div`
-  padding: 20px;
-  margin: 20px;
-  border: 2px solid #ff0000;
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #f8f9fa;
+  border: 2px solid #dc3545;
   border-radius: 8px;
-  background: #ffe6e6;
-  text-align: center;
+  padding: 40px 20px;
+  margin: 20px 0;
 `;
 
 const ErrorTitle = styled.h2`
-  color: #cc0000;
-  margin-bottom: 10px;
-`;
-
-const ErrorMessage = styled.p`
-  color: #666;
-  margin-bottom: 15px;
+  color: #dc3545;
+  margin-bottom: 20px;
+  text-align: center;
 `;
 
 const RetryButton = styled.button`
-  padding: 10px 20px;
-  background: #4CAF50;
+  background: #007bff;
   color: white;
   border: none;
-  border-radius: 4px;
+  padding: 12px 24px;
+  border-radius: 6px;
   cursor: pointer;
-  
+  font-size: 16px;
+  margin: 20px 10px;
+  transition: background-color 0.2s;
+
   &:hover {
-    background: #45a049;
+    background: #0056b3;
   }
 `;
 
-class ErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
+export class ErrorBoundary extends Component<Props, State> {
+  public state: State = {
+    hasError: false
+  };
 
-  static getDerivedStateFromError(error: Error): State {
-    // 如果是 MetaMask 相关错误，不设置错误状态
-    const errorStr = String(error?.message || error || '');
-    const stackStr = String(error?.stack || '');
-    
-    if (errorStr.includes('MetaMask') || 
-        errorStr.includes('ethereum') ||
-        errorStr.includes('Failed to connect') ||
-        errorStr.includes('chrome-extension') ||
-        stackStr.includes('chrome-extension')) {
-      return { hasError: false, error: null };
-    }
-    
+  public static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    const errorStr = String(error?.message || error || '');
-    const stackStr = String(error?.stack || '');
-    
-    // 如果是 MetaMask 相关错误，静默处理
-    if (errorStr.includes('MetaMask') || 
-        errorStr.includes('ethereum') ||
-        errorStr.includes('Failed to connect') ||
-        errorStr.includes('chrome-extension') ||
-        stackStr.includes('chrome-extension')) {
-      console.warn('MetaMask error caught by ErrorBoundary and suppressed:', errorStr);
-      this.setState({ hasError: false, error: null });
-      return;
-    }
-    
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('🚫 Error Boundary caught an error:', error, errorInfo);
+    this.setState({ error });
   }
 
-  handleRetry = () => {
-    this.setState({ hasError: false, error: null });
+  private handleRetry = () => {
+    this.setState({ hasError: false, error: undefined });
+    window.location.reload();
   };
 
-  render() {
-    if (this.state.hasError && this.state.error) {
-      // 不显示 MetaMask 相关错误的错误页面
-      if (this.state.error.message?.includes('MetaMask') || 
-          this.state.error.message?.includes('ethereum') ||
-          this.state.error.message?.includes('Failed to connect')) {
-        return this.props.children;
-      }
-
+  public render() {
+    if (this.state.hasError) {
       return (
         <ErrorContainer>
-          <ErrorTitle>Oops! Something went wrong</ErrorTitle>
-          <ErrorMessage>
-            We encountered an unexpected error. Please try refreshing the page.
-          </ErrorMessage>
+          <ErrorTitle>🚫 应用程序遇到错误</ErrorTitle>
+          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+            <p>很抱歉，FMH 扫雷游戏遇到了一个意外错误。</p>
+            <p>请尝试刷新页面。</p>
+          </div>
           <RetryButton onClick={this.handleRetry}>
-            Try Again
+            🔄 重试
           </RetryButton>
         </ErrorContainer>
       );

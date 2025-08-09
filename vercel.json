@@ -1,12 +1,20 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": ".next",
   "framework": "nextjs",
+  "buildCommand": "npm run build",
   "installCommand": "npm install --legacy-peer-deps",
+  "functions": {
+    "pages/api/**/*.js": {
+      "runtime": "nodejs18.x"
+    },
+    "pages/api/**/*.ts": {
+      "runtime": "nodejs18.x"
+    }
+  },
   "env": {
     "NEXT_PUBLIC_MINESWEEPER_CONTRACT": "0x4bE377d2bf2b3412b6eBF1b179314fd90adf9C27",
     "NEXT_PUBLIC_FMH_TOKEN_CONTRACT": "0x83aB028468ef2a5495Cc7964B3266437956231E2",
     "NEXT_PUBLIC_CHAIN_ID": "10143",
-    "NEXT_PUBLIC_NETWORK_NAME": "Monad Testnet"
+    "NEXT_PUBLIC_NETWORK_NAME": "Monad Testnet",
+    "DATABASE_URL": "file:./database/minesweeper.db"
   }
 }

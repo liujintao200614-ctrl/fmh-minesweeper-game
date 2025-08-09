@@ -1,6 +1,6 @@
 -- FMH 扫雷游戏数据库结构设计
 -- 创建时间: 2025-01-01
--- 版本: v1.0
+-- 版本: v2.0 - V2.0奖励系统升级
 
 -- 1. 用户表 - 存储用户基本信息
 CREATE TABLE users (
@@ -71,6 +71,11 @@ CREATE TABLE game_sessions (
     server_signature TEXT,                         -- 服务器签名
     nonce BIGINT,                                  -- 防重放随机数
     signature_deadline TIMESTAMP,                  -- 签名截止时间
+    
+    -- V2.0 新增字段
+    game_config TEXT,                              -- 游戏配置JSON
+    client_info TEXT,                              -- 客户端信息JSON (IP, 指纹等)
+    fmh_earned REAL DEFAULT 0,                     -- 实际获得的FMH数量
     
     -- 系统字段
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -310,3 +315,99 @@ BEGIN
         updated_at = CURRENT_TIMESTAMP
     WHERE id = NEW.user_id;
 END;
+
+-- 7. nonce防重放表 - 防止重复使用签名
+CREATE TABLE used_nonces (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nonce_key TEXT UNIQUE NOT NULL,               -- nonce唯一标识
+    player_address TEXT NOT NULL,                 -- 玩家地址
+    game_id INTEGER NOT NULL,                     -- 游戏ID
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- 创建时间
+    expires_at INTEGER NOT NULL,                  -- 过期时间戳
+    
+    -- 索引
+    INDEX idx_nonce_key (nonce_key),
+    INDEX idx_player_address (player_address),
+    INDEX idx_expires_at (expires_at)
+);
+
+-- 清理过期nonce的触发器
+CREATE TRIGGER cleanup_expired_nonces
+AFTER INSERT ON used_nonces
+BEGIN
+    DELETE FROM used_nonces WHERE expires_at < strftime('%s', 'now');
+END;
+
+-- V2.0 新增表结构
+
+-- 8. 玩家统计表 - V2.0玩家等级和统计
+CREATE TABLE player_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_address TEXT UNIQUE NOT NULL,           -- 玩家钱包地址
+    consecutive_wins INTEGER DEFAULT 0,            -- 当前连胜数
+    today_earned REAL DEFAULT 0,                   -- 今日获得FMH
+    player_level TEXT DEFAULT 'bronze',            -- 玩家等级 (bronze/silver/gold/platinum/legend)
+    total_wins INTEGER DEFAULT 0,                  -- 总胜利数
+    total_games INTEGER DEFAULT 0,                 -- 总游戏数
+    last_play_time INTEGER DEFAULT 0,              -- 最后游戏时间戳
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    
+    -- 索引
+    INDEX idx_player_address (player_address),
+    INDEX idx_player_level (player_level),
+    INDEX idx_today_earned (today_earned),
+    INDEX idx_consecutive_wins (consecutive_wins DESC)
+);
+
+-- 9. 可疑活动记录表 - 反作弊日志
+CREATE TABLE suspicious_activities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    game_id TEXT NOT NULL,                         -- 游戏ID
+    player_address TEXT NOT NULL,                  -- 玩家地址
+    activity_type TEXT NOT NULL,                   -- 活动类型 (IMPOSSIBLE_SPEED, PATTERN_MATCH, 等)
+    severity TEXT NOT NULL,                        -- 严重程度 (LOW, MEDIUM, HIGH, CRITICAL)
+    description TEXT NOT NULL,                     -- 描述
+    evidence TEXT,                                 -- 证据JSON
+    detected_at INTEGER NOT NULL,                  -- 检测时间戳
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    
+    -- 索引
+    INDEX idx_player_address (player_address),
+    INDEX idx_activity_type (activity_type),
+    INDEX idx_severity (severity),
+    INDEX idx_detected_at (detected_at DESC)
+);
+
+-- 10. 等级升级记录表
+CREATE TABLE level_upgrades (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_address TEXT NOT NULL,                  -- 玩家地址
+    old_level TEXT,                                -- 原等级
+    new_level TEXT NOT NULL,                       -- 新等级
+    upgraded_at INTEGER NOT NULL,                  -- 升级时间戳
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    
+    -- 索引
+    INDEX idx_player_address (player_address),
+    INDEX idx_new_level (new_level),
+    INDEX idx_upgraded_at (upgraded_at DESC)
+);
+
+-- 11. 待发放奖励表 - 记录预分配但未发放的奖励
+CREATE TABLE pending_rewards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_address TEXT NOT NULL,                  -- 玩家地址
+    game_id TEXT NOT NULL,                         -- 游戏ID
+    reward_amount REAL NOT NULL,                   -- 奖励数量
+    status TEXT DEFAULT 'pending',                 -- 状态: pending/claimed/failed
+    tx_hash TEXT,                                  -- 发放交易哈希
+    created_at INTEGER NOT NULL,                   -- 创建时间戳
+    claimed_at INTEGER,                            -- 领取时间戳
+    
+    -- 索引
+    INDEX idx_player_address (player_address),
+    INDEX idx_status (status),
+    INDEX idx_created_at (created_at DESC),
+    UNIQUE INDEX idx_player_game (player_address, game_id)
+);
