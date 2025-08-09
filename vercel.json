@@ -1,14 +1,5 @@
 {
   "buildCommand": "npm run build:next",
-  "installCommand": "npm install --legacy-peer-deps",
-  "functions": {
-    "pages/api/**/*.js": {
-      "runtime": "@vercel/node@3.0.0"
-    },
-    "pages/api/**/*.ts": {
-      "runtime": "@vercel/node@3.0.0"
-    }
-  },
   "env": {
     "NEXT_PUBLIC_MINESWEEPER_CONTRACT": "0x4bE377d2bf2b3412b6eBF1b179314fd90adf9C27",
     "NEXT_PUBLIC_FMH_TOKEN_CONTRACT": "0x83aB028468ef2a5495Cc7964B3266437956231E2",
