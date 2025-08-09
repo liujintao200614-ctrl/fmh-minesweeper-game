@@ -334,15 +334,15 @@ const GameModeToggle = styled.div`
 `;
 
 const defaultGameConfig: GameConfig = {
-  width: 16,
-  height: 16,
-  mines: 40
+  width: 15,
+  height: 15,
+  mines: 35
 };
 
 const presets = {
-  easy: { width: 9, height: 9, mines: 10 },
-  medium: { width: 16, height: 16, mines: 40 },
-  hard: { width: 24, height: 16, mines: 80 }  // 调整为合理范围，避免溢出
+  easy: { width: 9, height: 9, mines: 10 },        // 9*9 = 81 ✓
+  medium: { width: 15, height: 15, mines: 35 },    // 15*15 = 225 ✓
+  hard: { width: 15, height: 17, mines: 60 }       // 15*17 = 255 ✓ (正好在限制内)
 };
 
 export default function ModernMinesweeper() {
@@ -756,7 +756,12 @@ export default function ModernMinesweeper() {
                     min="5" 
                     max="30" 
                     value={gameConfig.width}
-                    onChange={(e) => setGameConfig(prev => ({ ...prev, width: Math.min(Math.max(parseInt(e.target.value) || 5, 5), 30) }))}
+                    onChange={(e) => {
+                      const width = Math.min(Math.max(parseInt(e.target.value) || 5, 5), 30);
+                      // 确保 width * height <= 255
+                      const maxWidth = Math.floor(255 / gameConfig.height);
+                      setGameConfig(prev => ({ ...prev, width: Math.min(width, maxWidth) }));
+                    }}
                   />
                 </SettingRow>
 
@@ -767,7 +772,12 @@ export default function ModernMinesweeper() {
                     min="5" 
                     max="30" 
                     value={gameConfig.height}
-                    onChange={(e) => setGameConfig(prev => ({ ...prev, height: Math.min(Math.max(parseInt(e.target.value) || 5, 5), 30) }))}
+                    onChange={(e) => {
+                      const height = Math.min(Math.max(parseInt(e.target.value) || 5, 5), 30);
+                      // 确保 width * height <= 255
+                      const maxHeight = Math.floor(255 / gameConfig.width);
+                      setGameConfig(prev => ({ ...prev, height: Math.min(height, maxHeight) }));
+                    }}
                   />
                 </SettingRow>
 

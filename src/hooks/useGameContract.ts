@@ -77,8 +77,14 @@ export const useGameContract = (signer: ethers.JsonRpcSigner | null, account: st
       return null;
     }
 
-    // 确保地雷数不超过总格子数
+    // 确保地雷数不超过总格子数，并检查乘积是否会在合约中溢出
     const totalCells = width * height;
+    if (totalCells > 255) {
+      console.error('Board size too large for contract (uint8 overflow):', { width, height, totalCells });
+      setError(`Board size ${width}x${height}=${totalCells} exceeds contract limit (255). Try smaller dimensions.`);
+      return null;
+    }
+    
     if (mines >= totalCells) {
       console.error('Too many mines for board size:', { width, height, mines, totalCells });
       setError(`Too many mines (${mines}) for board size ${width}x${height}`);
