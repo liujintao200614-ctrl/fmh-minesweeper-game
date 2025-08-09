@@ -1,6 +1,6 @@
 {
   "name": "fmh-minesweeper-integrated",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "FMH扫雷游戏 - 集成Web3代币管理和区块链功能",
   "scripts": {
     "dev": "vite",
